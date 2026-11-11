@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Galaxie · mon univers Claude Code</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#03030a">
+  <meta name="application-name" content="Galaxie">
+  <link rel="stylesheet" href="/vendor/fonts/fonts.css">
+  <link rel="stylesheet" href="/style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/vendor/three/build/three.module.js",
+      "three/addons/": "/vendor/three/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="scene"></div>
+
+  <header class="brand">
+    <h1>Galaxie</h1>
+    <p id="stats">&nbsp;</p>
+  </header>
+
+  <div class="topbar">
+    <div class="search">
+      <input id="search" type="search" placeholder="Chercher un projet, un thème, une conversation…" autocomplete="off" spellcheck="false">
+      <ul id="results" hidden></ul>
+    </div>
+    <button id="btn-settings" class="btn icon" title="Réglages">⚙</button>
+    <button id="btn-theme" class="btn">+ Thème</button>
+    <button id="btn-new" class="btn primary">+ Projet</button>
+  </div>
+
+  <nav class="crumbs" id="crumbs" hidden></nav>
+
+  <div class="legend" id="legend"></div>
+
+  <aside id="panel" class="panel"></aside>
+
+  <div id="tooltip" class="tooltip" hidden></div>
+  <div id="toast" class="toast" role="status"></div>
+
+  <dialog id="dlg" class="dlg"></dialog>
+
+  <div id="loading" class="loading"><span>Cartographie de la galaxie…</span></div>
+  <script>
+    setTimeout(function () {
+      if (!window.__galaxieReady) document.querySelector('#loading span').textContent =
+        'La Galaxie ne démarre pas. Ton navigateur doit être récent (WebGL activé) : essaie Chrome, Edge ou Firefox.';
+    }, 10000);
+  </script>
+  <script>
+    // Rend la Galaxie installable comme application, et prépare la page « endormie »
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    window.__installEvt = null;
+    addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window.__installEvt = e; });
+  </script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

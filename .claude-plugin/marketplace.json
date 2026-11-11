@@ -1,0 +1,14 @@
+{
+  "name": "galaxie",
+  "description": "Galaxie, ton univers Claude Code en 3D",
+  "owner": {
+    "name": "Seb"
+  },
+  "plugins": [
+    {
+      "name": "galaxie",
+      "source": "./plugins/galaxie",
+      "description": "Tes projets, conversations et compétences Claude Code dans un univers 3D. Ouvre Claude dans le bon dossier d'un clic."
+    }
+  ]
+}

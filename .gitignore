@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+CLAUDE.local.md
+.claude/settings.local.json
+
+# ancienne version perso (contient des données personnelles)
+ancienne-version/
+
+# captures des outils de test du navigateur
+.playwright-mcp/
