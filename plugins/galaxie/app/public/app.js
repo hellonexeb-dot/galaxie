@@ -521,7 +521,7 @@ function buildSystem(g, gal) {
 function buildPlanet(sys, kind, p, i) {
   const r = rng(hash(p.key));
   const R = 10 + Math.max(0, ...sys.items.map((x) => planetExtent(kind, x))) + i * sys.step + (r() - 0.5) * 0.4;
-  let size, ageDays, dim;
+  let size, ageDays, dim, faded = false;
   if (kind === 'project') {
     size = planetSize(kind, p);
     ageDays = (Date.now() - p.lastActivity) / 864e5;
@@ -529,7 +529,10 @@ function buildPlanet(sys, kind, p, i) {
   } else {
     size = planetSize(kind, p);
     ageDays = p.updated ? (Date.now() - p.updated) / 864e5 : 999;
-    dim = p.cat === 'plugin' && p.enabled === false;
+    // Compétence jamais utilisée dans une conversation : estompée (pâle, nom au survol),
+    // mais toujours cliquable et trouvable par la recherche.
+    faded = !usedCaps().has(p.key);
+    dim = faded || (p.cat === 'plugin' && p.enabled === false);
   }
   const color = dotColor(kind, p);
 
@@ -545,8 +548,9 @@ function buildPlanet(sys, kind, p, i) {
   const tex = planetTexture(hash(p.key), dim);
   const mesh = new THREE.Mesh(
     new THREE.SphereGeometry(size, 40, 28),
-    new THREE.MeshStandardMaterial({ map: tex.map, roughness: tex.kind === 'ice' || tex.kind === 'ocean' ? 0.6 : 0.95, metalness: 0 }),
+    new THREE.MeshStandardMaterial({ map: tex.map, roughness: tex.kind === 'ice' || tex.kind === 'ocean' ? 0.6 : 0.95, metalness: 0, ...(faded ? { transparent: true, opacity: 0.45 } : {}) }),
   );
+  if (faded) orbit.material.opacity = 0.05;
   if (tex.kind !== 'rock') {
     const rim = new THREE.Mesh(new THREE.SphereGeometry(size * 1.04, 40, 28), new THREE.MeshBasicMaterial({ color: tex.kind === 'ocean' ? '#6fa8ff' : tex.palette[1], transparent: true, opacity: 0.1, side: THREE.BackSide, depthWrite: false }));
     holder.add(rim);
@@ -556,7 +560,7 @@ function buildPlanet(sys, kind, p, i) {
   holder.add(mesh);
 
   // halo visible seulement de loin, pour repérer les planètes actives
-  const glowOp = dim ? 0.05 : kind === 'project' ? 0.08 + 0.3 * Math.exp(-ageDays / 20) : 0.16;
+  const glowOp = faded ? 0.02 : dim ? 0.05 : kind === 'project' ? 0.08 + 0.3 * Math.exp(-ageDays / 20) : 0.16;
   const atmo = sprite(SOFT, color, size * 3.4, glowOp);
   holder.add(atmo);
 
@@ -572,7 +576,7 @@ function buildPlanet(sys, kind, p, i) {
   const lbl = label(`<i style="background:${color}"></i>${esc(p.name)}`, 'lbl-planet');
   holder.add(lbl);
 
-  const pl = { kind, p, sys, pivot, holder, mesh, dim, atmo, atmoOp: glowOp, orbit, label: lbl, R, size, speed: 0.5 / Math.pow(R, 0.9), moons: [] };
+  const pl = { kind, p, sys, pivot, holder, mesh, dim, faded, atmo, atmoOp: glowOp, orbit, label: lbl, R, size, speed: 0.5 / Math.pow(R, 0.9), moons: [] };
   if (!angles.has(p.key)) angles.set(p.key, r() * Math.PI * 2);
   mesh.userData.planet = pl;
   pl.hit = hitSprite(Math.max(size * 3.2, 4), { kind: 'planet', planet: pl });
@@ -599,6 +603,13 @@ function buildPlanet(sys, kind, p, i) {
 
   applyFilter(pl);
   return pl;
+}
+
+// Clés des compétences qui ont servi dans au moins une conversation (recalculé à chaque construction)
+let usedCache = null;
+function usedCaps() {
+  if (!usedCache || usedCache.data !== state.data) usedCache = { data: state.data, keys: new Set(state.data.projects.flatMap((p) => (p.uses || []).map((u) => u.key))) };
+  return usedCache.keys;
 }
 
 function applyFilter(pl) { pl.pivot.visible = pl.kind !== 'project' || state.filters.has(pl.p.status); }
@@ -827,8 +838,9 @@ function updateLabels() {
       const sunVisible = focusedG && ((v === 'galaxy') || (!focused && d < 260));
       setLabel(sys.label, sunVisible, Math.max(0.35, Math.min(1, 1.5 - d / 900)), hovered?.sys === sys);
       for (const pl of sys.planets) {
-        const show = v !== 'universe' && shown(pl.pivot) && ((focused && v !== 'galaxy') || d < 120);
         const isFocus = state.planet === pl;
+        const show = v !== 'universe' && shown(pl.pivot) && ((focused && v !== 'galaxy') || d < 120)
+          && (!pl.faded || isFocus || hovered?.planet === pl);
         setLabel(pl.label, show, v === 'planet' && !isFocus ? 0.45 : 1, isFocus || hovered?.planet === pl);
         for (const m of pl.moons) setLabel(m.label, isFocus, 1, state.hotSession === m.session.id || hovered?.moon === m);
       }
@@ -983,18 +995,20 @@ function bindPlanetList(sys) {
 }
 
 function renderCatPanel(sys) {
-  const c = CAT[sys.cat];
-  const list = sys.items.map((p) => `
-    <li data-key="${esc(p.key)}">
+  const c = CAT[sys.cat], used = usedCaps();
+  const list = (items, faded) => items.map((p) => `
+    <li data-key="${esc(p.key)}"${faded ? ' class="faded"' : ''}>
       <span class="dot" style="background:${c.color};box-shadow:0 0 8px ${c.color}${p.enabled === false ? ';opacity:.35' : ''}"></span>
       <span class="t"><b>${esc(p.name)}</b><small>${!p.global && p.projects?.length ? `<span class="proj-tag">projet : ${esc(p.projects.map((x) => x.name).join(', '))}</span> · ` : ''}${esc(p.fr?.resume || p.detail || (p.description || '').slice(0, 90))}</small></span>
       <span class="go">→</span>
     </li>`).join('');
+  const usedItems = sys.items.filter((p) => used.has(p.key)), otherItems = sys.items.filter((p) => !used.has(p.key));
   openPanel(`
     <div class="eyebrow">Soleil · <button id="cp-gal">Compétences</button></div>
     <h2>${esc(c.label)}</h2>
     <p class="lede">${esc(c.blurb)}</p>
-    <section><h3><span>Planètes</span><span>${sys.items.length}</span></h3><ul class="list">${list}</ul></section>`);
+    ${usedItems.length ? `<section><h3><span>Déjà utilisées</span><span>${usedItems.length}</span></h3><ul class="list">${list(usedItems, false)}</ul></section>` : ''}
+    ${otherItems.length ? `<section><h3><span>Pas encore utilisées</span><span>${otherItems.length}</span></h3><p class="sub-note">Plus pâles dans la galaxie. Clique dessus pour découvrir à quoi elles servent.</p><ul class="list">${list(otherItems, true)}</ul></section>` : ''}`);
   $('#cp-gal').onclick = () => focusGalaxy(sys.gal);
   bindPlanetList(sys);
 }
@@ -1041,7 +1055,7 @@ function renderCapPanel(pl, editing = false) {
     ${textBlock}
     ${p.path ? `<div class="actions" style="margin-top:16px"><button class="btn small" id="cp-folder">Ouvrir le dossier</button></div>` : ''}
     <section><dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></section>
-    ${linkChips(pl, 'Utilisée dans', 'Les projets où Claude s’en est servi. Le nombre indique combien de conversations.')}
+    ${pl.faded ? '<p class="sub-note">Pas encore utilisée dans tes conversations : c’est pour ça qu’elle est plus pâle dans la galaxie.</p>' : linkChips(pl, 'Utilisée dans', 'Les projets où Claude s’en est servi. Le nombre indique combien de conversations.')}
     ${p.description && p.cat !== 'mcp' && p.cat !== 'connector' ? `<section><details class="orig"><summary>Description d’origine</summary><p>${esc(p.description)}</p></details></section>` : ''}
     ${kids.length ? `<section><h3><span>Lunes · contenu</span><span>${kids.length}</span></h3><ul class="list">${list}</ul></section>` : ''}`);
 

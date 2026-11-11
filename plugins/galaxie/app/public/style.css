@@ -112,6 +112,8 @@ select.field option { background: #15142a; }
 .list li { display: flex; align-items: center; gap: 10px; padding: 9px 10px; margin: 0 -10px; border-radius: 10px; cursor: pointer; transition: background .15s; }
 .list li:hover, .list li.hot { background: var(--glass-2); }
 .list li.hot { box-shadow: inset 2px 0 0 var(--accent); }
+.list li.faded { opacity: .55; transition: background .15s, opacity .15s; }
+.list li.faded:hover { opacity: 1; }
 .list .dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
 .list .moon { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #cfd0dc; opacity: .7; }
 .list .t { flex: 1; min-width: 0; }
