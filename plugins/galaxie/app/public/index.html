@@ -33,6 +33,7 @@
       <input id="search" type="search" placeholder="Chercher un projet, un thème, une conversation…  (Ctrl+K)" autocomplete="off" spellcheck="false">
       <ul id="results" hidden></ul>
     </div>
+    <button id="btn-tour" class="btn icon" title="Visite guidée">?</button>
     <button id="btn-settings" class="btn icon" title="Réglages">⚙</button>
     <button id="btn-theme" class="btn">+ Thème</button>
     <button id="btn-new" class="btn primary">+ Projet</button>
@@ -41,6 +42,10 @@
   <nav class="crumbs" id="crumbs" hidden></nav>
 
   <div class="legend" id="legend"></div>
+
+  <button id="btn-center" class="btn recenter" title="Remettre la vue en place (touche R)">◎ Recentrer</button>
+
+  <div id="tour" class="tour" role="dialog" aria-live="polite" hidden></div>
 
   <aside id="panel" class="panel"></aside>
 

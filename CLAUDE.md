@@ -27,6 +27,9 @@ plugins/galaxie/
 ## Tester
 
 ```
+# tests de la lecture des conversations (titres, compétences utilisées, rangement par projet)
+npm test
+
 # valider le plugin et la marketplace
 claude plugin validate .
 
@@ -37,6 +40,10 @@ GALAXIE_PORT=4848 GALAXIE_HOME=/tmp/galaxie-test node plugins/galaxie/app/server
 node plugins/galaxie/app/server.js --list-caps [--missing]   # utilisé par /galaxie:decrire
 node plugins/galaxie/app/server.js --shortcut                # utilisé par /galaxie:raccourci
 ```
+
+Les tests (`tests/`) chargent `server.js` comme module : il exporte alors ses fonctions de lecture sans démarrer (`require.main !== module`). Ils travaillent dans un dossier temporaire avec de fausses conversations ; si Claude Code change le format de ses `.jsonl`, c'est là qu'il faut ajouter un cas.
+
+Préférences propres au navigateur (dans `localStorage`, pas dans `~/.galaxie`) : `galaxie-visite-vue` (visite guidée déjà vue, le bouton « ? » la relance) et `galaxie-pc-modeste` (rendu allégé : pas de lueur, résolution 1, 30 images/s).
 
 Pour tester sans toucher au vrai profil : `GALAXIE_HOME` pour les données, `USERPROFILE`/`HOME` pour le bureau, `APPDATA` pour le démarrage automatique sous Windows.
 

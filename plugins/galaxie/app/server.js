@@ -964,6 +964,13 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// Chargé par les tests (tests/ à la racine du dépôt) : on expose la lecture des conversations
+// sans lancer le serveur ni aucune commande.
+if (require.main !== module) {
+  module.exports = { parseSession, sessionUses, resolveUses, gather, cleanPrompt };
+  return;
+}
+
 const APP_URL = `http://${HOST}:${PORT}/`;
 const args = process.argv.slice(2);
 

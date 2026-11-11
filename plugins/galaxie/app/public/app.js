@@ -93,6 +93,24 @@ addEventListener('resize', () => {
   labelRenderer.setSize(innerWidth, innerHeight);
 });
 
+// Mode « PC modeste » : moins de pixels à calculer, pas d'effet de lueur, 30 images par seconde.
+// Réglage propre à cet ordinateur, gardé dans le navigateur.
+const LIGHT_KEY = 'galaxie-pc-modeste';
+let lightMode = localStorage.getItem(LIGHT_KEY) === '1';
+function applyLightMode() {
+  const pr = lightMode ? 1 : Math.min(devicePixelRatio, 2);
+  renderer.setPixelRatio(pr);
+  composer.setPixelRatio(pr);
+  composer.setSize(innerWidth, innerHeight);
+  bloom.enabled = !lightMode;
+}
+function setLightMode(on) {
+  lightMode = on;
+  localStorage.setItem(LIGHT_KEY, on ? '1' : '0');
+  applyLightMode();
+}
+applyLightMode();
+
 function makeGlow(stops) {
   const c = document.createElement('canvas'); c.width = c.height = 128;
   const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
@@ -688,8 +706,20 @@ function back() {
   else if (state.view === 'system') focusGalaxy(state.gal);
   else if (state.view === 'galaxy') focusUniverse();
 }
+// Remet la caméra en place sur ce qu'on regarde (utile après un zoom vers le pointeur)
+function recenter() {
+  if (state.view === 'planet') focusPlanet(state.planet);
+  else if (state.view === 'system') focusSystem(state.sys);
+  else if (state.view === 'galaxy') focusGalaxy(state.gal);
+  else focusUniverse();
+}
+$('#btn-center').onclick = recenter;
+
+const typing = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || $('#dlg').open;
 addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !$('#dlg').open && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') back();
+  if (typing()) return;
+  if (e.key === 'Escape') back();
+  else if ((e.key === 'r' || e.key === 'R' || e.key === 'Home') && !e.ctrlKey && !e.metaKey && !e.altKey) recenter();
 });
 
 // =====================================================================
@@ -781,7 +811,11 @@ renderer.domElement.addEventListener('dblclick', (ev) => {
 const clock = new THREE.Clock();
 let viewShift = 0;
 
-function tick() {
+let lastDraw = 0;
+function tick(now = performance.now()) {
+  requestAnimationFrame(tick);
+  if (lightMode && now - lastDraw < 31) return; // ~30 images par seconde
+  lastDraw = now;
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
 
   for (const sys of systems) {
@@ -818,7 +852,6 @@ function tick() {
   updateLabels();
   composer.render();
   labelRenderer.render(scene, camera);
-  requestAnimationFrame(tick);
 }
 
 function setLabel(o, visible, opacity = 1, hot = false) {
@@ -1492,6 +1525,10 @@ function openSettings() {
             : '<button type="button" class="btn small primary" id="s-install-tab">Ouvrir dans le navigateur pour l’installer</button><p class="sub">Un onglet s’ouvre : clique sur l’icône <b>Installer</b> (un écran avec une flèche ou un <b>+</b>) à droite de la barre d’adresse, puis sur <b>Installer</b>. Tu pourras ensuite l’épingler à la barre des tâches avec sa propre icône.</p>'}
         <label class="check"><input type="checkbox" id="s-auto" ${d.autostart ? 'checked' : ''}> Lancer la Galaxie au démarrage de l’ordinateur <span>discrètement, sans ouvrir de fenêtre, pour que l’application épinglée fonctionne toujours</span></label>
       </div>
+      <label>Affichage</label>
+      <div class="app-box">
+        <label class="check"><input type="checkbox" id="s-light" ${lightMode ? 'checked' : ''}> Mode PC modeste <span>Image un peu moins fine et sans lueur autour des soleils, mais plus fluide sur un ordinateur ancien ou sans carte graphique. Ce réglage ne vaut que pour cet ordinateur.</span></label>
+      </div>
       ${d.hiddenCount ? `<label>Planètes retirées</label><button type="button" class="btn small" id="s-unhide">Réafficher les ${d.hiddenCount} planètes retirées</button>` : ''}
       <div class="err" id="f-err"></div>
       <div class="row"><button class="btn" value="cancel" formnovalidate>Annuler</button><button class="btn primary" id="f-ok">Enregistrer</button></div>
@@ -1508,6 +1545,7 @@ function openSettings() {
     try { const r = await api.post('/api/autostart', { on: e.target.checked }); state.data.autostart = r.autostart; toast(r.autostart ? 'La Galaxie se lancera au démarrage' : 'Démarrage automatique désactivé'); }
     catch (err) { e.target.checked = !e.target.checked; toast(err.message, true); }
   };
+  $('#s-light').onchange = (e) => { setLightMode(e.target.checked); toast(e.target.checked ? 'Mode PC modeste activé' : 'Affichage complet rétabli'); };
   $('#s-add').onclick = async () => {
     const p = await pickFolderUI('Où chercher tes projets ?');
     if (p) { const ta = $('#s-roots'); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + p; }
@@ -1540,6 +1578,7 @@ try {
   tick();
   setTimeout(() => $('#loading').classList.add('done'), 300);
   if (!state.data.onboarded) setTimeout(openWelcome, 900);
+  else setTimeout(() => { if (!localStorage.getItem(TOUR_KEY)) startTour(); }, 1400); // TOUR_KEY est défini plus bas
 } catch (e) {
   $('#loading span').textContent = 'Impossible de joindre le serveur de la galaxie : ' + e.message;
 }
@@ -1614,9 +1653,95 @@ function openWelcome() {
       dlg.close();
       await load(); lastSig = sig(state.data);
       toast(scanRoots.length ? 'Ta galaxie est cartographiée ✦' : 'Ta galaxie est prête ✦');
+      if (!localStorage.getItem(TOUR_KEY)) setTimeout(startTour, 900);
     } catch (err) { $('#f-err').textContent = err.message; }
   };
 }
+
+// =====================================================================
+// Visite guidée : 4 bulles, au premier lancement puis avec le bouton « ? »
+// =====================================================================
+const TOUR_KEY = 'galaxie-visite-vue';
+const tourEl = $('#tour');
+let tour = null;
+
+function tourSteps() {
+  // Un vrai soleil (thème) bien rempli, et sa planète la plus bavarde, pour montrer des exemples concrets
+  const themed = systems.filter((s) => s.kind === 'project' && s.planets.some((pl) => shown(pl.pivot)));
+  const sys = themed.filter((s) => !s.errant).sort((a, b) => b.planets.length - a.planets.length)[0] || themed[0];
+  const pl = sys && sys.planets.filter((x) => shown(x.pivot)).sort((a, b) => b.p.sessions.length - a.p.sessions.length)[0];
+  const keys = '<kbd>Échap</kbd> remonte d’un niveau, <kbd>Ctrl</kbd>+<kbd>K</kbd> cherche, <kbd>R</kbd> recentre la vue.';
+  const steps = [{
+    title: 'Bienvenue dans ton univers',
+    text: 'Au centre, c’est <b>toi</b>. Autour tournent tes galaxies : celles de tes projets, et celle de tes <b>compétences</b>, tout ce que Claude sait faire en plus.<br><br>Glisse avec la souris pour tourner, utilise la molette pour zoomer.',
+    go: () => focusUniverse(),
+  }];
+  if (sys) steps.push({
+    title: 'Un soleil = un thème',
+    text: sys.errant
+      ? 'Les projets pas encore rangés flottent ici, en <b>planètes errantes</b>. Crée un thème avec « + Thème » pour les regrouper autour d’un soleil.'
+      : `Chaque soleil regroupe des projets qui vont ensemble. Celui-ci s’appelle <b>${esc(sys.name)}</b>. Tu peux en créer d’autres avec « + Thème ».`,
+    go: () => focusSystem(sys),
+  });
+  if (pl) steps.push({
+    title: 'Une planète = un projet',
+    text: `Chaque planète est un dossier de ton ordinateur. Celle-ci, c’est <b>${esc(pl.p.name)}</b>. Sa fiche, à droite, te permet de l’ouvrir ou d’y lancer Claude.`,
+    go: () => focusPlanet(pl),
+  });
+  if (pl) steps.push({
+    title: 'Une lune = une conversation',
+    text: (pl.p.sessions.length
+      ? 'Les petites lunes autour de la planète sont tes conversations avec Claude. Dans la fiche, clique sur <b>Reprendre</b> pour en continuer une là où tu t’étais arrêté.'
+      : 'Chaque fois que tu parleras à Claude dans ce projet, une petite lune apparaîtra autour de la planète. Tu pourras la reprendre depuis la fiche.') + '<br><br>' + keys,
+    go: () => {
+      focusPlanet(pl);
+      if (pl.p.sessions.length) { state.hotSession = pl.p.sessions[0].id; renderProjectPanel(pl); scrollToHot(); }
+    },
+  });
+  else steps[0].text += '<br><br>' + keys;
+  return steps;
+}
+
+function startTour() {
+  if (dlg.open) return;
+  tour = { steps: tourSteps(), i: 0 };
+  showTourStep();
+}
+function showTourStep() {
+  const { steps, i } = tour, s = steps[i], last = i === steps.length - 1;
+  s.go();
+  tourEl.innerHTML = `
+    <div class="step">Visite · ${i + 1} sur ${steps.length}</div>
+    <h3>${s.title}</h3>
+    <p>${s.text}</p>
+    <div class="row">
+      <div class="dots">${steps.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</div>
+      ${last ? '' : '<button class="skip" id="t-skip">Passer</button>'}
+      ${i ? '<button class="btn small" id="t-prev">Retour</button>' : ''}
+      <button class="btn small primary" id="t-next">${last ? 'C’est parti !' : 'Suivant'}</button>
+    </div>`;
+  tourEl.hidden = false;
+  // la bulle se glisse dans la nouvelle version de l'élément : on rejoue son apparition
+  tourEl.style.animation = 'none'; void tourEl.offsetWidth; tourEl.style.animation = '';
+  $('#t-next').onclick = () => (last ? endTour() : (tour.i++, showTourStep()));
+  $('#t-prev')?.addEventListener('click', () => { tour.i--; showTourStep(); });
+  $('#t-skip')?.addEventListener('click', endTour);
+  $('#t-next').focus({ preventScroll: true });
+}
+function endTour() {
+  tour = null; tourEl.hidden = true;
+  localStorage.setItem(TOUR_KEY, '1');
+}
+// Pendant la visite : flèches pour avancer ou reculer, Échap pour arrêter
+addEventListener('keydown', (e) => {
+  if (!tour) return;
+  if (e.key === 'Escape') endTour();
+  else if (e.key === 'ArrowRight' && tour.i < tour.steps.length - 1) { tour.i++; showTourStep(); }
+  else if (e.key === 'ArrowLeft' && tour.i > 0) { tour.i--; showTourStep(); }
+  else return;
+  e.preventDefault(); e.stopImmediatePropagation();
+}, true);
+$('#btn-tour').onclick = startTour;
 
 // =====================================================================
 // Compétences rangées dans un projet
