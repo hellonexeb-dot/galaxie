@@ -21,8 +21,8 @@ Et aussi : une recherche qui fouille les projets, les titres de conversations et
 ## Ce qu'il te faut
 
 - **Claude Code**
-- **Node.js** 18 ou plus récent. Si tu ne l'as pas, télécharge la version « LTS » sur [nodejs.org](https://nodejs.org).
-- Windows, macOS ou Linux, avec un navigateur récent (Chrome, Edge, Firefox, Safari).
+- **Node.js** 18 ou plus récent. Pas de panique si tu ne l'as pas : `/galaxie:installer` te propose de l'installer.
+- Windows, macOS ou Linux, avec un navigateur récent (Chrome ou Edge conseillés, pour l'avoir en application).
 
 ## Installation
 
@@ -33,22 +33,30 @@ Dans Claude Code, tape :
 /plugin install galaxie@galaxie
 ```
 
-Puis redémarre Claude Code.
+Puis redémarre Claude Code et tape :
+
+```
+/galaxie:installer
+```
+
+Claude t'accompagne pas à pas, en te demandant ton accord à chaque étape : Node.js si besoin, premier lancement, application avec sa fenêtre, icône sur le bureau, démarrage automatique et descriptions en français. Tu peux relancer cette commande à tout moment, pour reprendre ou réparer.
 
 ## Utilisation
 
 | Commande | Ce qu'elle fait |
 |---|---|
-| `/galaxie:ouvrir` | Ouvre la Galaxie dans ton navigateur |
-| `/galaxie:raccourci` | Crée une icône « Galaxie » sur ton bureau, pour l'ouvrir sans passer par Claude |
+| `/galaxie:installer` | Installe et configure la Galaxie pas à pas (ou la répare) |
+| `/galaxie:ouvrir` | Ouvre la Galaxie |
+| `/galaxie:raccourci` | Crée (ou répare) l'icône « Galaxie » du bureau, pour l'ouvrir sans passer par Claude |
 | `/galaxie:decrire` | Claude écrit en français la description de chacune de tes compétences |
 
 Dans la Galaxie :
 
 - **clic** sur un astre ou sur son nom : on s'en approche ;
-- **glisser** : tourner autour ; **molette** : zoomer ;
-- **Échap** ou **← Retour** : remonter d'un niveau ;
-- **/** : rechercher.
+- **glisser** : tourner autour ; **molette** : zoomer vers le pointeur ;
+- **Échap** ou **← Retour** : remonter d'un niveau ; **R** ou **◎ Recentrer** : remettre la vue en place ;
+- **Ctrl+K** ou **/** : rechercher ;
+- **?** : revoir la visite guidée. Ordinateur un peu lent ? Coche « Mode PC modeste » dans ⚙ Réglages.
 
 ## Tes données restent chez toi
 
@@ -70,18 +78,21 @@ Au premier lancement, la Galaxie te demande si elle peut regarder dans des dossi
 
 ### Ce qu'elle écrit
 
-- **Uniquement** dans son propre dossier `~/.galaxie` : tes thèmes, statuts, notes et descriptions.
+- Dans son propre dossier `~/.galaxie` : tes thèmes, statuts, notes et descriptions.
+- **Seulement si tu le demandes** : l'icône « Galaxie » du bureau, et un raccourci de démarrage automatique (dans le dossier « Démarrage » de Windows, les `LaunchAgents` de macOS ou l'`autostart` de Linux).
 - Elle ne modifie jamais `~/.claude` ni tes projets.
 - « Retirer une planète » ne fait que la masquer : ton dossier n'est jamais supprimé.
 - Le bouton « + Projet » crée un dossier vide, à l'endroit que tu as choisi.
 
 ## Désinstaller
 
+D'abord, si tu l'avais activé, décoche « Lancer la Galaxie au démarrage de l'ordinateur » dans ⚙ Réglages. Puis :
+
 ```
 /plugin uninstall galaxie@galaxie
 ```
 
-Tu peux ensuite supprimer le dossier `~/.galaxie` et l'icône du bureau si tu les avais créés.
+Tu peux ensuite supprimer le dossier `~/.galaxie` et l'icône du bureau.
 
 ## Licence
 

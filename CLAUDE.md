@@ -8,7 +8,7 @@ Plugin Claude Code qui affiche l'univers de l'utilisateur en 3D dans le navigate
 .claude-plugin/marketplace.json     marketplace « galaxie »
 plugins/galaxie/
   .claude-plugin/plugin.json        manifeste (auteur Seb, version)
-  skills/ouvrir|decrire|raccourci/  les commandes /galaxie:*
+  skills/installer|ouvrir|decrire|raccourci/  les commandes /galaxie:* (installer = pas à pas, relançable)
   app/server.js                     serveur Node sans dépendance (Windows, macOS, Linux)
   app/catalogue.json                descriptions françaises génériques des compétences courantes
   app/public/                       page 3D (three.js), service worker, page « endormie »
@@ -18,7 +18,7 @@ plugins/galaxie/
 ## Règles du projet
 
 - **Rien ne sort de la machine.** Aucun CDN, aucune requête externe, aucun envoi de données. Le serveur n'écoute que `127.0.0.1`.
-- **Lecture seule sur `~/.claude`.** La Galaxie n'écrit que dans `~/.galaxie` (configuration, descriptions, lanceur, icônes).
+- **Lecture seule sur `~/.claude`.** La Galaxie n'écrit que dans `~/.galaxie` (configuration, descriptions, lanceur, icônes), plus, **à la demande**, l'icône du bureau et le raccourci de démarrage automatique.
 - **Jamais de secret affiché** : pour les serveurs MCP, seulement le nom et l'hôte (`safeTarget`).
 - **Aucun dossier exploré sans accord** : `scanRoots` est vide tant que l'écran de bienvenue n'a pas été validé.
 - Les requêtes POST exigent l'en-tête `X-Galaxie: 1` (protection contre les autres sites) et l'hôte doit être `127.0.0.1` ou `localhost` (DNS rebinding).
@@ -38,7 +38,9 @@ GALAXIE_PORT=4848 GALAXIE_HOME=/tmp/galaxie-test node plugins/galaxie/app/server
 
 # autres modes du serveur
 node plugins/galaxie/app/server.js --list-caps [--missing]   # utilisé par /galaxie:decrire
-node plugins/galaxie/app/server.js --shortcut                # utilisé par /galaxie:raccourci
+node plugins/galaxie/app/server.js --shortcut                # utilisé par /galaxie:raccourci et /galaxie:installer
+node plugins/galaxie/app/server.js --status                  # état de l'installation (JSON), utilisé par /galaxie:installer
+node plugins/galaxie/app/server.js --autostart on|off        # démarrage automatique, utilisé par /galaxie:installer
 ```
 
 Les tests (`tests/`) chargent `server.js` comme module : il exporte alors ses fonctions de lecture sans démarrer (`require.main !== module`). Ils travaillent dans un dossier temporaire avec de fausses conversations ; si Claude Code change le format de ses `.jsonl`, c'est là qu'il faut ajouter un cas.

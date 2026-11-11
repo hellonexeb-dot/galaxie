@@ -692,11 +692,41 @@ function findInstalledApp() {
   return null;
 }
 
+// Node utilisé par les raccourcis : l'installation standard si elle existe (elle survit aux mises
+// à jour), sinon celui qui fait tourner la Galaxie en ce moment. /galaxie:installer vérifie qu'il existe toujours.
+function stableNode() {
+  const std = IS_WIN ? [path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs', 'node.exe')]
+    : IS_MAC ? ['/opt/homebrew/bin/node', '/usr/local/bin/node'] : ['/usr/bin/node', '/usr/local/bin/node'];
+  return std.find((f) => fs.existsSync(f)) || process.execPath;
+}
+
+const findDesktop = () => [path.join(HOME, 'Desktop'), path.join(HOME, 'Bureau'), path.join(HOME, 'OneDrive', 'Desktop'), path.join(HOME, 'OneDrive', 'Bureau')].find((d) => fs.existsSync(d)) || HOME;
+
+// Icônes Galaxie du bureau Windows : celle posée par Chrome à l'installation de l'application
+// (elle ouvre la fenêtre sans réveiller le serveur), celles déjà passées par le lanceur, et Galaxie.lnk.
+function winDesktopIcons(desktop) {
+  const chrome = Buffer.from('--app-id', 'utf16le');
+  const ours = ['Galaxie.vbs', 'lancer.js'].map((m) => Buffer.from(m, 'utf16le'));
+  return listFiles(desktop, '.lnk').filter((f) => /^galaxie\b/i.test(f)).map((f) => {
+    const file = path.join(desktop, f);
+    let b = Buffer.alloc(0); try { b = fs.readFileSync(file); } catch { /* illisible */ }
+    return { file, chrome: b.includes(chrome), ours: ours.some((m) => b.includes(m)) };
+  }).filter((i) => i.chrome || i.ours || path.basename(i.file) === 'Galaxie.lnk');
+}
+function winShortcutTarget(lnk) {
+  const pq = (t) => "'" + String(t).replace(/'/g, "''") + "'";
+  try {
+    const out = require('child_process').execFileSync('powershell.exe', ['-NoProfile', '-Command', `$s=(New-Object -ComObject WScript.Shell).CreateShortcut(${pq(lnk)});[Console]::OutputEncoding=[Text.Encoding]::UTF8;$s.TargetPath;$s.Arguments`], { encoding: 'utf8', windowsHide: true });
+    const [target = '', argsLine = ''] = out.split(/\r?\n/);
+    return { target: target.trim(), args: argsLine.trim() };
+  } catch { return { target: '', args: '' }; }
+}
+
 // Raccourci Windows (.lnk) qui lance directement Node, fenêtre réduite.
 // Pas de script .vbs : Windows Defender bloque les VBScript qui lancent un programme caché.
 function winShortcut(lnk, args, { icon, desc = 'Mon univers Claude Code' } = {}) {
   const pq = (t) => "'" + String(t).replace(/'/g, "''") + "'"; // chaîne PowerShell
-  const ps = `$s=(New-Object -ComObject WScript.Shell).CreateShortcut(${pq(lnk)});$s.TargetPath=${pq(process.execPath)};$s.Arguments=${pq(args)};$s.WorkingDirectory=${pq(DATA_DIR)};$s.WindowStyle=7;${icon ? `$s.IconLocation=${pq(icon + ',0')};` : ''}$s.Description=${pq(desc)};$s.Save()`;
+  const ps = `$s=(New-Object -ComObject WScript.Shell).CreateShortcut(${pq(lnk)});$s.TargetPath=${pq(stableNode())};$s.Arguments=${pq(args)};$s.WorkingDirectory=${pq(DATA_DIR)};$s.WindowStyle=7;${icon ? `$s.IconLocation=${pq(icon + ',0')};` : ''}$s.Description=${pq(desc)};$s.Save()`;
   require('child_process').execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], { stdio: 'ignore', windowsHide: true });
 }
 
@@ -722,12 +752,12 @@ function setAutostart(on) {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>fr.galaxie.serveur</string>
-  <key>ProgramArguments</key><array><string>${x(process.execPath)}</string><string>${x(launcher)}</string><string>--no-open</string></array>
+  <key>ProgramArguments</key><array><string>${x(stableNode())}</string><string>${x(launcher)}</string><string>--no-open</string></array>
   <key>RunAtLoad</key><true/>
 </dict></plist>
 `);
   } else {
-    fs.writeFileSync(f, `[Desktop Entry]\nType=Application\nName=Galaxie (serveur)\nExec="${process.execPath}" "${launcher}" --no-open\nX-GNOME-Autostart-enabled=true\nNoDisplay=true\n`);
+    fs.writeFileSync(f, `[Desktop Entry]\nType=Application\nName=Galaxie (serveur)\nExec="${stableNode()}" "${launcher}" --no-open\nX-GNOME-Autostart-enabled=true\nNoDisplay=true\n`);
   }
 }
 
@@ -998,35 +1028,83 @@ if (args.includes('--shortcut')) {
   const launcher = writeLauncher();
   // Copie de l'icône hors du plugin (son dossier change à chaque mise à jour)
   for (const f of ['icon.ico', 'icon-512.png']) { try { fs.copyFileSync(path.join(PUBLIC_DIR, 'icons', f), path.join(DATA_DIR, f)); } catch { /* icône par défaut */ } }
-  const desktop = [path.join(HOME, 'Desktop'), path.join(HOME, 'Bureau'), path.join(HOME, 'OneDrive', 'Desktop'), path.join(HOME, 'OneDrive', 'Bureau')].find((d) => fs.existsSync(d)) || HOME;
+  const desktop = findDesktop();
   let made;
   if (IS_WIN) {
     try { fs.unlinkSync(path.join(DATA_DIR, 'Galaxie.vbs')); } catch { /* ancienne version : bloquée par Windows Defender */ }
     // Quand la Galaxie est installée comme application, Chrome pose sa propre icône sur le bureau :
     // elle ouvre la fenêtre sans réveiller le serveur (page « endormie »). On la fait passer par le
     // lanceur, en gardant son nom et sa place, plutôt que d'ajouter une deuxième icône.
-    // (marque de Chrome, ou icône déjà convertie lors d'un passage précédent)
-    const markers = ['--app-id', 'Galaxie.vbs', 'lancer.js'].map((m) => Buffer.from(m, 'utf16le'));
-    const chromeIcons = listFiles(desktop, '.lnk')
-      .filter((f) => /^galaxie\b/i.test(f) && f !== 'Galaxie.lnk')
-      .map((f) => path.join(desktop, f))
-      .filter((f) => { try { const b = fs.readFileSync(f); return markers.some((m) => b.includes(m)); } catch { return false; } });
-    const targets = chromeIcons.length ? chromeIcons : [path.join(desktop, 'Galaxie.lnk')];
+    const icons = winDesktopIcons(desktop).map((i) => i.file);
+    const targets = icons.length ? icons : [path.join(desktop, 'Galaxie.lnk')];
     for (const lnk of targets) winShortcut(lnk, `"${launcher}"`, { icon: path.join(DATA_DIR, 'icon.ico') });
     made = targets.join(', ');
   } else if (IS_MAC) {
     made = path.join(desktop, 'Galaxie.command');
-    fs.writeFileSync(made, `#!/bin/bash\n"${process.execPath}" "${launcher}"\nosascript -e 'tell application "Terminal" to close front window' >/dev/null 2>&1 &\n`, { mode: 0o755 });
+    fs.writeFileSync(made, `#!/bin/bash\n"${stableNode()}" "${launcher}"\nosascript -e 'tell application "Terminal" to close front window' >/dev/null 2>&1 &\n`, { mode: 0o755 });
   } else {
     const apps = path.join(HOME, '.local', 'share', 'applications');
     fs.mkdirSync(apps, { recursive: true });
-    const entry = `[Desktop Entry]\nType=Application\nName=Galaxie\nComment=Mon univers Claude Code\nExec="${process.execPath}" "${launcher}"\nIcon=${path.join(DATA_DIR, 'icon-512.png')}\nTerminal=false\n`;
+    const entry = `[Desktop Entry]\nType=Application\nName=Galaxie\nComment=Mon univers Claude Code\nExec="${stableNode()}" "${launcher}"\nIcon=${path.join(DATA_DIR, 'icon-512.png')}\nTerminal=false\n`;
     fs.writeFileSync(path.join(apps, 'galaxie.desktop'), entry, { mode: 0o755 });
     made = path.join(desktop, 'galaxie.desktop');
     fs.writeFileSync(made, entry, { mode: 0o755 });
   }
   console.log('Raccourci créé : ' + made);
   process.exit(0);
+}
+
+// Démarrage automatique (utilisé par /galaxie:installer) : --autostart on | off
+if (args.includes('--autostart')) {
+  const on = args[args.indexOf('--autostart') + 1] !== 'off';
+  setAutostart(on);
+  console.log(autostartEnabled() ? 'Démarrage automatique activé : ' + autostartPath() : 'Démarrage automatique désactivé');
+  process.exit(0);
+}
+
+// État de l'installation (utilisé par /galaxie:installer pour savoir quelles étapes sont faites)
+if (args.includes('--status')) {
+  (async () => {
+    const running = await new Promise((done) => {
+      const r = http.get({ host: HOST, port: PORT, path: '/', timeout: 2000 }, (x) => { x.resume(); done(x.statusCode === 200); });
+      r.on('error', () => done(false));
+      r.on('timeout', () => { r.destroy(); done(false); });
+    });
+    const data = gather();
+    const desktop = findDesktop();
+    const launcher = path.join(DATA_DIR, 'lancer.js');
+    let icone;
+    if (IS_WIN) {
+      const icons = winDesktopIcons(desktop).map((i) => {
+        if (!i.ours) return { fichier: i.file, etat: 'a-reparer' }; // icône de Chrome : n'allume pas le serveur
+        const t = winShortcutTarget(i.file);
+        const ok = fs.existsSync(t.target) && t.args.includes('lancer.js') && fs.existsSync(launcher);
+        return { fichier: i.file, etat: ok ? 'ok' : 'a-reparer', node: t.target };
+      });
+      icone = { etat: !icons.length ? 'absente' : icons.every((i) => i.etat === 'ok') ? 'ok' : 'a-reparer', icones: icons };
+    } else {
+      const f = path.join(desktop, IS_MAC ? 'Galaxie.command' : 'galaxie.desktop');
+      let txt = ''; try { txt = fs.readFileSync(f, 'utf8'); } catch { /* absente */ }
+      const node = (txt.match(/"([^"]*node[^"]*)"/) || [])[1] || '';
+      icone = { etat: !txt ? 'absente' : fs.existsSync(node) && fs.existsSync(launcher) ? 'ok' : 'a-reparer', fichier: f, node };
+    }
+    const missing = data.caps.filter((c) => !c.fr.resume).length;
+    process.stdout.write(JSON.stringify({
+      systeme: process.platform,
+      node: { chemin: process.execPath, version: process.version, pour_les_raccourcis: stableNode() },
+      galaxie_lancee: running,
+      adresse: APP_URL,
+      bienvenue_validee: data.onboarded,
+      application_installee: IS_WIN || IS_MAC ? data.appInstalled : null, // null : impossible à vérifier sous Linux
+      icone_bureau: icone,
+      demarrage_auto: data.autostart,
+      projets: data.projects.length,
+      conversations: data.projects.reduce((n, p) => n + p.sessions.length, 0),
+      competences: { total: data.caps.length, sans_description: missing },
+    }, null, 2) + '\n');
+    process.exit(0);
+  })();
+  return;
 }
 
 // Par défaut, le serveur se détache pour continuer à tourner après la fin de la session Claude
