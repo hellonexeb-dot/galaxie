@@ -43,6 +43,21 @@ Puis redémarre Claude Code et tape :
 
 Claude t'accompagne pas à pas, en te demandant ton accord à chaque étape : Node.js si besoin, premier lancement, rangement de tes projets en galaxies et en thèmes, application avec sa fenêtre, icône sur le bureau, démarrage automatique et descriptions en français. Tu peux relancer cette commande à tout moment, pour reprendre ou réparer.
 
+### Depuis Claude Desktop
+
+Ça marche aussi, dans l'onglet **Code** de Claude Desktop, avec une session sur ton ordinateur (pas une session « cloud ») : tape les mêmes commandes dans la zone de saisie. Tu peux aussi passer par le bouton **+** à côté de la zone de saisie, puis **Add plugins** (ou **Plugins**), une fois la source `hellonexeb-dot/galaxie` ajoutée.
+
+Claude Code dans le terminal et l'onglet Code de Claude Desktop partagent les mêmes plugins : installé dans l'un, la Galaxie est disponible dans l'autre. Elle ne fonctionne pas dans l'onglet Chat ni dans Cowork.
+
+### Recevoir les nouvelles versions
+
+Par défaut, Claude Code ne met pas à jour tout seul les plugins de la communauté. Deux possibilités :
+
+- **automatique** (conseillé) : tape `/plugin`, va dans l'onglet **Marketplaces**, choisis **galaxie** puis **Enable auto-update** ;
+- **à la main**, quand tu veux : dans un terminal, `claude plugin update galaxie@galaxie`.
+
+Dans les deux cas, la nouvelle version est prise en compte au prochain démarrage de Claude Code.
+
 ## Utilisation
 
 | Commande | Ce qu'elle fait |
