@@ -1281,6 +1281,7 @@ search.oninput = () => {
   const q = norm(search.value.trim());
   if (!q) { results.hidden = true; return; }
   found = [];
+  for (const g of galaxies) if (norm(g.name).includes(q)) found.push({ type: 'gal', gal: g, title: g.name, sub: 'Galaxie' });
   for (const s of systems) {
     if (!s.errant && norm(s.name).includes(q)) found.push({ type: 'sys', sys: s, title: s.name, sub: `Soleil · ${s.gal.name}` });
     for (const pl of s.planets) {
@@ -1294,6 +1295,10 @@ search.oninput = () => {
       }
     }
   }
+  // Les meilleurs résultats d'abord : nom qui commence par la recherche, puis galaxies,
+  // thèmes et projets avant les conversations (l'ordre d'origine est gardé à égalité).
+  const rank = (f) => (norm(f.title).startsWith(q) ? 0 : norm(f.title).includes(q) ? 1 : 2) * 2 + (f.type === 'moon' ? 1 : 0);
+  found = found.map((f, i) => [rank(f), i, f]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
   found = found.slice(0, 40); sel = 0;
   results.innerHTML = found.length ? found.map((f, i) => `<li data-i="${i}" class="${i === 0 ? 'sel' : ''}"><b>${esc(f.title)}</b><small>${esc(f.sub)}</small></li>`).join('') : '<li class="empty">Rien dans cet univers…</li>';
   results.hidden = false;
@@ -1310,6 +1315,7 @@ search.onkeydown = (e) => {
 search.onblur = () => setTimeout(() => { results.hidden = true; }, 120);
 function go(f) {
   results.hidden = true; search.blur();
+  if (f.type === 'gal') return focusGalaxy(f.gal);
   if (f.type === 'sys') return focusSystem(f.sys);
   if (!shown(f.pl.pivot)) { state.filters.add(f.pl.p.status); applyFilter(f.pl); }
   focusPlanet(f.pl);
@@ -1321,6 +1327,7 @@ function go(f) {
 }
 addEventListener('keydown', (e) => {
   if (e.key === '/' && document.activeElement === document.body) { e.preventDefault(); search.focus(); }
+  if (e.key.toLowerCase() === 'k' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); search.focus(); search.select(); }
 });
 
 // =====================================================================
