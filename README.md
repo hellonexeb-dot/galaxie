@@ -4,9 +4,11 @@
 
 Tu crées un dossier par projet et tu ouvres Claude dedans ? Au bout de quelques dizaines de projets, on s'y perd. La Galaxie les rassemble tous dans un univers que tu explores à la souris.
 
-- **Au centre, toi.** Autour, deux galaxies.
-- **La galaxie Projets** : chaque soleil est un thème (un client, le perso…), chaque planète un projet, chaque lune une conversation avec Claude.
+- **Au centre, toi.** Autour, tes galaxies.
+- **Tes galaxies de projets** : une par grand domaine de ta vie (Pro, Perso, Formation…). Dans chacune, chaque soleil est un thème (un client, une activité), chaque planète un projet, chaque lune une conversation avec Claude.
 - **La galaxie Compétences** : tes skills, plugins, serveurs MCP et connecteurs, chacun avec une description en français, ce qu'il fait, quand t'en servir et un exemple de phrase à dire à Claude.
+
+**Pas besoin de tout ranger toi-même** : Claude regarde tes projets, te propose des galaxies et des thèmes, et range tout dès que tu es d'accord (`/galaxie:ranger`). Tu peux ensuite tout renommer et déplacer d'un clic.
 
 Depuis la fiche d'un projet :
 
