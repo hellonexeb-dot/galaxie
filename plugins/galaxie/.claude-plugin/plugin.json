@@ -1,7 +1,7 @@
 {
   "name": "galaxie",
   "displayName": "Galaxie",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Ton univers Claude Code en 3D : tes projets en planètes regroupées par thèmes, tes conversations en lunes, tes skills, plugins, MCP et connecteurs dans une seconde galaxie. Ouvre Claude (terminal ou Desktop) dans le bon dossier d'un clic. Tout reste sur ta machine.",
   "author": {
     "name": "Seb"

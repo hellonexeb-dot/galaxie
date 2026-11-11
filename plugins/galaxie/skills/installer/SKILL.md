@@ -1,6 +1,6 @@
 ---
 name: installer
-description: Installe et configure la Galaxie pas à pas (Node.js, premier lancement, application, icône du bureau, démarrage automatique, descriptions en français), avec l'accord de l'utilisateur à chaque étape. Reprend là où on s'était arrêté et sert aussi à réparer une installation. À utiliser quand l'utilisateur tape /galaxie:installer, vient d'installer le plugin, demande à installer ou réparer la Galaxie, ou quand Node.js manque.
+description: Installe et configure la Galaxie pas à pas (Node.js, premier lancement, rangement des projets en galaxies et thèmes, application, icône du bureau, démarrage automatique, descriptions en français), avec l'accord de l'utilisateur à chaque étape. Reprend là où on s'était arrêté et sert aussi à réparer une installation. À utiliser quand l'utilisateur tape /galaxie:installer, vient d'installer le plugin, demande à installer ou réparer la Galaxie, ou quand Node.js manque.
 ---
 
 # Installer la Galaxie, pas à pas
@@ -16,7 +16,7 @@ Tu accompagnes un débutant. Réponds en français, en tutoyant, sans jargon, en
 
 ## Avant de commencer
 
-Dis en deux lignes ce qui va se passer : vérifier Node.js, ouvrir la Galaxie, en faire une application avec une icône, puis quelques réglages facultatifs. Compte environ 5 minutes.
+Dis en deux lignes ce qui va se passer : vérifier Node.js, ouvrir la Galaxie, ranger ses projets, en faire une application avec une icône, puis quelques réglages facultatifs. Compte environ 10 minutes.
 
 ## Étape 1 · Node.js (obligatoire)
 
@@ -54,7 +54,7 @@ Lance :
 NODE "${CLAUDE_PLUGIN_ROOT}/app/server.js" --status
 ```
 
-La réponse (JSON) dit ce qui est déjà en place : `galaxie_lancee`, `bienvenue_validee`, `application_installee` (`null` sous Linux : impossible à vérifier, demande à l'utilisateur), `icone_bureau.etat` (`ok`, `absente` ou `a-reparer`), `demarrage_auto`, `competences.sans_description`.
+La réponse (JSON) dit ce qui est déjà en place : `galaxie_lancee`, `bienvenue_validee`, `application_installee` (`null` sous Linux : impossible à vérifier, demande à l'utilisateur), `icone_bureau.etat` (`ok`, `absente` ou `a-reparer`), `demarrage_auto`, `rangement.projets_sans_theme`, `competences.sans_description`.
 
 Montre une courte liste : ✅ fait, ⬜ à faire. Puis enchaîne sur la première étape à faire. Relance `--status` après chaque étape qui dépend de l'utilisateur.
 
@@ -70,7 +70,13 @@ Si `bienvenue_validee` est faux : explique qu'un écran de bienvenue s'est ouver
 
 Une visite guidée de 4 bulles démarre ensuite dans la Galaxie : dis-le, l'utilisateur peut la suivre maintenant ou plus tard (bouton **?**).
 
-## Étape 4 · En faire une application (conseillé)
+## Étape 4 · Ranger la Galaxie (conseillé)
+
+Si `rangement.projets_sans_theme` vaut 3 ou plus : explique qu'au départ les projets flottent un peu en vrac, et propose de les ranger ensemble maintenant (environ 3 minutes) : Claude regarde ses projets, propose des galaxies (Pro, Perso…) et des thèmes, et il valide avant que rien ne bouge. Si l'utilisateur est d'accord, utilise le skill `galaxie:ranger` (avec `NODE` dans ses commandes), puis reviens à l'étape suivante.
+
+S'il a moins de 3 projets, saute cette étape : dis simplement qu'il pourra lancer `/galaxie:ranger` quand sa Galaxie se sera remplie.
+
+## Étape 5 · En faire une application (conseillé)
 
 Si `application_installee` est faux : explique qu'en l'installant comme application, la Galaxie a sa propre fenêtre et sa propre icône, comme un vrai logiciel. Il faut Chrome ou Edge.
 
@@ -78,7 +84,7 @@ Si l'utilisateur est d'accord : dans la Galaxie, ouvrir **⚙ Réglages**, puis 
 
 Cette étape doit être faite **avant** l'icône du bureau : en installant l'application, le navigateur pose sa propre icône, qui ouvre la fenêtre sans réveiller la Galaxie. L'étape suivante la répare.
 
-## Étape 5 · L'icône du bureau (conseillé)
+## Étape 6 · L'icône du bureau (conseillé)
 
 Si `icone_bureau.etat` n'est pas `ok`, propose de créer (ou réparer) l'icône qui ouvre la Galaxie d'un double-clic, sans passer par Claude. Après accord :
 
@@ -88,7 +94,7 @@ NODE "${CLAUDE_PLUGIN_ROOT}/app/server.js" --shortcut
 
 Dis où se trouve l'icône. Sous Windows, si une icône posée par le navigateur existait, elle a été réparée (même nom, même place). Sur macOS, préviens qu'au premier double-clic il faudra peut-être autoriser `Galaxie.command` (clic droit → **Ouvrir**).
 
-## Étape 6 · Démarrage automatique (facultatif)
+## Étape 7 · Démarrage automatique (facultatif)
 
 Si `demarrage_auto` est faux, explique simplement : la Galaxie se lance discrètement à l'allumage de l'ordinateur, sans ouvrir de fenêtre, et consomme très peu. C'est **conseillé si l'application est épinglée à la barre des tâches** : sans ça, l'icône épinglée affiche « La Galaxie est endormie » tant qu'on ne l'a pas réveillée. Si l'utilisateur est d'accord :
 
@@ -98,7 +104,7 @@ NODE "${CLAUDE_PLUGIN_ROOT}/app/server.js" --autostart on
 
 (Pour l'enlever plus tard : `--autostart off`, ou la case dans ⚙ Réglages.)
 
-## Étape 7 · Descriptions en français (facultatif)
+## Étape 8 · Descriptions en français (facultatif)
 
 Si `competences.sans_description` est supérieur à 0 : propose d'écrire en français une courte description de chaque compétence qui n'en a pas (quelques minutes). Si l'utilisateur est d'accord, utilise le skill `galaxie:decrire`, puis reviens au bilan.
 

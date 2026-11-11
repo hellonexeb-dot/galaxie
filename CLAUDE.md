@@ -8,7 +8,7 @@ Plugin Claude Code qui affiche l'univers de l'utilisateur en 3D dans le navigate
 .claude-plugin/marketplace.json     marketplace « galaxie »
 plugins/galaxie/
   .claude-plugin/plugin.json        manifeste (auteur Seb, version)
-  skills/installer|ouvrir|decrire|raccourci/  les commandes /galaxie:* (installer = pas à pas, relançable)
+  skills/installer|ouvrir|ranger|decrire|raccourci/  les commandes /galaxie:* (installer = pas à pas, relançable)
   app/server.js                     serveur Node sans dépendance (Windows, macOS, Linux)
   app/catalogue.json                descriptions françaises génériques des compétences courantes
   app/public/                       page 3D (three.js), service worker, page « endormie »
@@ -41,6 +41,8 @@ node plugins/galaxie/app/server.js --list-caps [--missing]   # utilisé par /gal
 node plugins/galaxie/app/server.js --shortcut                # utilisé par /galaxie:raccourci et /galaxie:installer
 node plugins/galaxie/app/server.js --status                  # état de l'installation (JSON), utilisé par /galaxie:installer
 node plugins/galaxie/app/server.js --autostart on|off        # démarrage automatique, utilisé par /galaxie:installer
+node plugins/galaxie/app/server.js --list-projects           # projets et rangement actuel (JSON), utilisé par /galaxie:ranger
+node plugins/galaxie/app/server.js --organize plan.json      # applique un rangement (galaxies, thèmes, projets à masquer), sans rien effacer
 ```
 
 Les tests (`tests/`) chargent `server.js` comme module : il exporte alors ses fonctions de lecture sans démarrer (`require.main !== module`). Ils travaillent dans un dossier temporaire avec de fausses conversations ; si Claude Code change le format de ses `.jsonl`, c'est là qu'il faut ajouter un cas.

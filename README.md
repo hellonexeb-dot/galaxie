@@ -39,7 +39,7 @@ Puis redémarre Claude Code et tape :
 /galaxie:installer
 ```
 
-Claude t'accompagne pas à pas, en te demandant ton accord à chaque étape : Node.js si besoin, premier lancement, application avec sa fenêtre, icône sur le bureau, démarrage automatique et descriptions en français. Tu peux relancer cette commande à tout moment, pour reprendre ou réparer.
+Claude t'accompagne pas à pas, en te demandant ton accord à chaque étape : Node.js si besoin, premier lancement, rangement de tes projets en galaxies et en thèmes, application avec sa fenêtre, icône sur le bureau, démarrage automatique et descriptions en français. Tu peux relancer cette commande à tout moment, pour reprendre ou réparer.
 
 ## Utilisation
 
@@ -47,6 +47,7 @@ Claude t'accompagne pas à pas, en te demandant ton accord à chaque étape : No
 |---|---|
 | `/galaxie:installer` | Installe et configure la Galaxie pas à pas (ou la répare) |
 | `/galaxie:ouvrir` | Ouvre la Galaxie |
+| `/galaxie:ranger` | Claude regarde tes projets et te propose des galaxies (Pro, Perso…) et des thèmes ; il range tout après ton accord |
 | `/galaxie:raccourci` | Crée (ou répare) l'icône « Galaxie » du bureau, pour l'ouvrir sans passer par Claude |
 | `/galaxie:decrire` | Claude écrit en français la description de chacune de tes compétences |
 

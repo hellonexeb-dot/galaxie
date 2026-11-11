@@ -102,6 +102,60 @@ function ensureDomains(cfg) {
   for (const t of cfg.themes || []) if (!ids.has(t.domain)) { t.domain = cfg.domains[0].id; changed = true; }
   if (changed) saveConfig(cfg);
 }
+// Rangement proposé par Claude (/galaxie:ranger) : { galaxies: [{ nom, themes: [{ nom, couleur?, projets: [chemins] }] }], masquer?: [chemins] }
+// Sans rien effacer : une galaxie ou un thème qui porte déjà ce nom est réutilisé, ce qui n'est pas cité reste en place.
+function applyPlan(cfg, plan, projects) {
+  const byKey = new Map(projects.map((p) => [p.key, p]));
+  const same = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const name40 = (v) => String(v || '').trim().slice(0, 40);
+  const report = { galaxies_creees: [], themes_crees: [], projets_ranges: 0, projets_masques: 0, introuvables: [] };
+  cfg.themes = cfg.themes || [];
+  ensureDomains(cfg);
+  const used = new Set(cfg.themes.map((t) => t.color));
+  const nextColor = () => { const c = THEME_COLORS.find((x) => !used.has(x)) || THEME_COLORS[cfg.themes.length % THEME_COLORS.length]; used.add(c); return c; };
+  const project = (p) => { const k = norm(String(p || '')); if (byKey.has(k)) return k; report.introuvables.push(String(p)); return null; };
+
+  const galaxies = Array.isArray(plan.galaxies) ? plan.galaxies : [];
+  galaxies.forEach((g, gi) => {
+    const gName = name40(g.nom);
+    if (!gName) return;
+    let d = cfg.domains.find((x) => same(x.name, gName));
+    if (!d) {
+      d = { id: 'd' + newId().slice(1) + gi, name: gName };
+      cfg.domains.push(d);
+      report.galaxies_creees.push(gName);
+    }
+    for (const t of Array.isArray(g.themes) ? g.themes : []) {
+      const tName = name40(t.nom);
+      if (!tName) continue;
+      let th = cfg.themes.find((x) => same(x.name, tName));
+      if (!th) {
+        th = { id: newId() + report.themes_crees.length, name: tName, color: VALID_COLOR.test(t.couleur || '') ? t.couleur : nextColor() };
+        cfg.themes.push(th);
+        report.themes_crees.push(tName);
+      }
+      th.domain = d.id;
+      for (const p of Array.isArray(t.projets) ? t.projets : []) {
+        const k = project(p);
+        if (!k) continue;
+        cfg.projects[k] = { ...(cfg.projects[k] || {}), theme: th.id };
+        report.projets_ranges++;
+      }
+    }
+  });
+  const hidden = new Set(cfg.hidden.map(norm));
+  for (const p of Array.isArray(plan.masquer) ? plan.masquer : []) {
+    const k = project(p);
+    if (!k || hidden.has(k) || byKey.get(k).core) continue;
+    cfg.hidden.push(byKey.get(k).path);
+    hidden.add(k);
+    report.projets_masques++;
+  }
+  // La galaxie « Projets » par défaut, restée vide, disparaît (il en reste toujours au moins une)
+  const def = cfg.domains.find((x) => x.id === 'd-projets');
+  if (def && cfg.domains.length > 1 && !cfg.themes.some((t) => t.domain === def.id)) cfg.domains = cfg.domains.filter((x) => x !== def);
+  return report;
+}
 function saveConfig(c) {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(c, null, 2), 'utf8');
 }
@@ -1006,7 +1060,7 @@ const server = http.createServer(async (req, res) => {
 // Chargé par les tests (tests/ à la racine du dépôt) : on expose la lecture des conversations
 // sans lancer le serveur ni aucune commande.
 if (require.main !== module) {
-  module.exports = { parseSession, sessionUses, resolveUses, gather, cleanPrompt };
+  module.exports = { parseSession, sessionUses, resolveUses, gather, cleanPrompt, applyPlan, loadConfig, saveConfig };
   return;
 }
 
@@ -1020,6 +1074,46 @@ if (args.includes('--list-caps')) {
     .filter((c) => !onlyMissing || !c.fr.resume)
     .map((c) => ({ key: c.textKey, famille: c.cat, nom: c.name, description_origine: c.description || '', detail: c.detail || '', contenu: c.children.map((x) => x.name) }));
   process.stdout.write(JSON.stringify({ fichier_descriptions: DESC_FILE, competences: caps }, null, 2) + '\n');
+  process.exit(0);
+}
+
+// Projets et rangement actuel (utilisé par /galaxie:ranger pour proposer des galaxies et des thèmes)
+if (args.includes('--list-projects')) {
+  const data = gather();
+  const theme = new Map(data.themes.map((t) => [t.id, t]));
+  const domain = new Map(data.domains.map((d) => [d.id, d.name]));
+  const byKey = new Map(data.projects.map((p) => [p.key, p]));
+  const projets = [...data.projects].sort((a, b) => b.lastActivity - a.lastActivity).map((p) => ({
+    chemin: p.path,
+    nom: p.name,
+    dossier_perso: p.core || undefined,
+    dans: p.parent ? byKey.get(p.parent)?.name : undefined,
+    theme: p.theme ? theme.get(p.theme).name : null,
+    galaxie: p.theme ? domain.get(theme.get(p.theme).domain) : null,
+    conversations: p.sessions.length,
+    derniere_activite: p.lastActivity ? new Date(p.lastActivity).toISOString().slice(0, 10) : null,
+    exemples_de_conversations: [...new Set(p.sessions.map((s) => String(s.title || '').slice(0, 80)))].filter((t) => t && t !== 'Conversation sans titre').slice(0, 3),
+  }));
+  const galaxies = data.domains.map((d) => ({
+    nom: d.name,
+    themes: data.themes.filter((t) => t.domain === d.id).map((t) => ({ nom: t.name, projets: data.projects.filter((p) => p.theme === t.id).length })),
+  }));
+  process.stdout.write(JSON.stringify({ galaxies, sans_theme: projets.filter((p) => !p.theme && !p.dossier_perso).length, projets }, null, 2) + '\n');
+  process.exit(0);
+}
+
+// Applique un rangement (utilisé par /galaxie:ranger) : --organize <fichier.json>
+if (args.includes('--organize')) {
+  const file = args[args.indexOf('--organize') + 1];
+  let plan;
+  try { plan = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { console.error('Plan illisible : ' + e.message); process.exit(1); }
+  const projects = gather().projects;
+  const cfg = loadConfig();
+  const backup = path.join(DATA_DIR, 'config.avant-rangement.json');
+  try { fs.copyFileSync(CONFIG_FILE, backup); } catch { /* pas encore de configuration */ }
+  const report = applyPlan(cfg, plan, projects);
+  saveConfig(cfg);
+  process.stdout.write(JSON.stringify({ ...report, sauvegarde: fs.existsSync(backup) ? backup : null }, null, 2) + '\n');
   process.exit(0);
 }
 
@@ -1100,6 +1194,7 @@ if (args.includes('--status')) {
       demarrage_auto: data.autostart,
       projets: data.projects.length,
       conversations: data.projects.reduce((n, p) => n + p.sessions.length, 0),
+      rangement: { galaxies: data.domains.length, themes: data.themes.length, projets_sans_theme: data.projects.filter((p) => !p.theme && !p.core).length },
       competences: { total: data.caps.length, sans_description: missing },
     }, null, 2) + '\n');
     process.exit(0);

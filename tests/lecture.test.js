@@ -180,3 +180,47 @@ test('rangement : aucun fichier de Claude n’est modifié', () => {
   const after = fs.readdirSync(SESSIONS).map((f) => [f, fs.statSync(path.join(SESSIONS, f)).mtimeMs]);
   assert.deepEqual(after, before);
 });
+
+// =====================================================================
+// Rangement proposé par /galaxie:ranger
+// =====================================================================
+const fakeCfg = (extra = {}) => ({ scanRoots: [], onboarded: true, hidden: [], projects: {}, themes: [], domains: [{ id: 'd-projets', name: 'Projets' }], capTexts: {}, ...extra });
+// mêmes clés que le serveur (minuscules sous Windows et macOS)
+const normKey = (p) => (process.platform === 'linux' ? path.resolve(p) : path.resolve(p).toLowerCase());
+const fakeProjects = (...names) => names.map((nm) => { const p = path.join(WORK, 'rangement', nm); return { key: normKey(p), path: p, name: nm }; });
+
+test('rangement : crée galaxies et thèmes, range les projets, retire la galaxie « Projets » restée vide', () => {
+  const list = fakeProjects('site-dupont', 'compta', 'voyage');
+  const cfg = fakeCfg();
+  const r = srv.applyPlan(cfg, {
+    galaxies: [
+      { nom: 'Pro', themes: [{ nom: 'Clients', projets: [list[0].path] }, { nom: 'Gestion', projets: [list[1].path] }] },
+      { nom: 'Perso', themes: [{ nom: 'Voyages', projets: [list[2].path, path.join(WORK, 'nexiste-pas')] }] },
+    ],
+  }, list);
+  assert.deepEqual(cfg.domains.map((d) => d.name), ['Pro', 'Perso']);
+  assert.deepEqual(cfg.themes.map((t) => t.name), ['Clients', 'Gestion', 'Voyages']);
+  assert.equal(new Set(cfg.themes.map((t) => t.color)).size, 3, 'une couleur différente par thème');
+  const themeOf = (p) => cfg.themes.find((t) => t.id === cfg.projects[p.key].theme);
+  assert.equal(themeOf(list[0]).name, 'Clients');
+  assert.equal(cfg.domains.find((d) => d.id === themeOf(list[2]).domain).name, 'Perso');
+  assert.equal(r.projets_ranges, 3);
+  assert.equal(r.introuvables.length, 1);
+});
+
+test('rangement : réutilise ce qui existe, garde notes et statuts, ne touche pas au reste', () => {
+  const list = fakeProjects('a', 'b', 'c');
+  const cfg = fakeCfg({
+    domains: [{ id: 'd-pro', name: 'Pro' }],
+    themes: [{ id: 't-cli', name: 'Clients', color: '#ffc86b', domain: 'd-pro' }, { id: 't-autre', name: 'Autre', color: '#7fc8ff', domain: 'd-pro' }],
+    projects: { [list[0].key]: { note: 'à garder', status: 'livre' }, [list[2].key]: { theme: 't-autre' } },
+  });
+  const r = srv.applyPlan(cfg, { galaxies: [{ nom: 'pro', themes: [{ nom: 'clients', projets: [list[0].path, list[1].path] }] }], masquer: [list[2].path] }, list);
+  assert.deepEqual(r.galaxies_creees, []);
+  assert.deepEqual(r.themes_crees, []);
+  assert.equal(cfg.themes.length, 2);
+  assert.deepEqual(cfg.projects[list[0].key], { note: 'à garder', status: 'livre', theme: 't-cli' });
+  assert.equal(cfg.projects[list[2].key].theme, 't-autre', 'un projet non cité garde son thème');
+  assert.equal(r.projets_masques, 1);
+  assert.deepEqual(cfg.hidden, [list[2].path]);
+});
