@@ -64,6 +64,9 @@ Une conversation est affichée sur la planète du projet où elle a fait **le pl
 - **Encodage** : ne jamais réécrire un fichier avec `Get-Content`/`Set-Content` de PowerShell 5 (accents cassés, BOM ajouté). Utiliser l'outil d'édition.
 
 - **Sélecteur de dossier Windows** : lancé par un PowerShell caché, il héritait de l'ordre « caché ». On affiche d'abord une fenêtre transparente au premier plan qui sert de parent. Une seule fenêtre à la fois (`pickPending`).
+- **Pas de `.vbs`** : Windows Defender bloque comme « logiciel potentiellement indésirable » un VBScript qui lance un programme caché. Le raccourci du bureau et le démarrage automatique sont des `.lnk` qui lancent directement `node lancer.js`, fenêtre réduite (`winShortcut`).
+- **Icône posée par Chrome** : en installant l'application, Chrome met sur le bureau une icône qui ouvre la fenêtre sans démarrer le serveur (page « endormie »). `--shortcut` la fait passer par le lanceur, en gardant son nom et sa place. L'icône épinglée à la barre des tâches, elle, ne peut pas être convertie : il faut le démarrage automatique.
+- **Le lanceur démarre la copie installée du plugin** (`~/.claude/plugins/cache/…`), pas le dossier de développement. Pour essayer une modification depuis l'icône : augmenter la version dans `plugin.json`, puis `claude plugin marketplace update galaxie` et `claude plugin update galaxie@galaxie`.
 - **Liens `claude://`** : à ouvrir avec `rundll32 url.dll,FileProtocolHandler` sous Windows ; `explorer.exe` les prend pour un dossier.
 - **Application installée** : Chrome crée un raccourci `.lnk` avec `--app-id` dans un sous-dossier du menu Démarrer dont le nom dépend de la langue (« Applications Chrome »). Edge n'en crée pas de détectable : Chrome passe donc en priorité.
 - **Éclairage 3D** : l'utilisateur ne veut ni planètes lumineuses ni soleils éblouissants. Planètes réalistes (textures procédurales), seuil de bloom élevé.

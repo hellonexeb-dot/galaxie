@@ -692,21 +692,30 @@ function findInstalledApp() {
   return null;
 }
 
+// Raccourci Windows (.lnk) qui lance directement Node, fenêtre réduite.
+// Pas de script .vbs : Windows Defender bloque les VBScript qui lancent un programme caché.
+function winShortcut(lnk, args, { icon, desc = 'Mon univers Claude Code' } = {}) {
+  const pq = (t) => "'" + String(t).replace(/'/g, "''") + "'"; // chaîne PowerShell
+  const ps = `$s=(New-Object -ComObject WScript.Shell).CreateShortcut(${pq(lnk)});$s.TargetPath=${pq(process.execPath)};$s.Arguments=${pq(args)};$s.WorkingDirectory=${pq(DATA_DIR)};$s.WindowStyle=7;${icon ? `$s.IconLocation=${pq(icon + ',0')};` : ''}$s.Description=${pq(desc)};$s.Save()`;
+  require('child_process').execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], { stdio: 'ignore', windowsHide: true });
+}
+
 // Démarrage automatique à l'ouverture de session (serveur seul, sans ouvrir de fenêtre)
+const WIN_STARTUP = path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup');
 function autostartPath() {
-  if (IS_WIN) return path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'Galaxie.vbs');
+  if (IS_WIN) return path.join(WIN_STARTUP, 'Galaxie.lnk');
   if (IS_MAC) return path.join(HOME, 'Library', 'LaunchAgents', 'fr.galaxie.serveur.plist');
   return path.join(HOME, '.config', 'autostart', 'galaxie.desktop');
 }
 const autostartEnabled = () => fs.existsSync(autostartPath());
 function setAutostart(on) {
   const f = autostartPath();
+  if (IS_WIN) { try { fs.unlinkSync(path.join(WIN_STARTUP, 'Galaxie.vbs')); } catch { /* ancienne version absente */ } }
   if (!on) { try { fs.unlinkSync(f); } catch { /* déjà absent */ } return; }
   const launcher = writeLauncher();
   fs.mkdirSync(path.dirname(f), { recursive: true });
   if (IS_WIN) {
-    const vq = (t) => '"' + t.replace(/"/g, '""') + '"';
-    fs.writeFileSync(f, 'CreateObject("WScript.Shell").Run ' + vq('"' + process.execPath + '" "' + launcher + '" --no-open') + ', 0, False\r\n');
+    winShortcut(f, `"${launcher}" --no-open`, { desc: 'Galaxie (démarrage discret)' });
   } else if (IS_MAC) {
     const x = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
     fs.writeFileSync(f, `<?xml version="1.0" encoding="UTF-8"?>
@@ -992,12 +1001,19 @@ if (args.includes('--shortcut')) {
   const desktop = [path.join(HOME, 'Desktop'), path.join(HOME, 'Bureau'), path.join(HOME, 'OneDrive', 'Desktop'), path.join(HOME, 'OneDrive', 'Bureau')].find((d) => fs.existsSync(d)) || HOME;
   let made;
   if (IS_WIN) {
-    const vbs = path.join(DATA_DIR, 'Galaxie.vbs');
-    const vq = (t) => '"' + t.replace(/"/g, '""') + '"'; // chaîne VBScript : guillemets doublés
-    fs.writeFileSync(vbs, 'CreateObject("WScript.Shell").Run ' + vq('"' + process.execPath + '" "' + launcher + '"') + ', 0, False\r\n');
-    made = path.join(desktop, 'Galaxie.lnk');
-    const ps = `$s=(New-Object -ComObject WScript.Shell).CreateShortcut('${made.replace(/'/g, "''")}');$s.TargetPath="$env:WINDIR\\System32\\wscript.exe";$s.Arguments='"${vbs.replace(/'/g, "''")}"';$s.IconLocation='${path.join(DATA_DIR, 'icon.ico').replace(/'/g, "''")},0';$s.Description='Mon univers Claude Code';$s.Save()`;
-    require('child_process').execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], { stdio: 'ignore' });
+    try { fs.unlinkSync(path.join(DATA_DIR, 'Galaxie.vbs')); } catch { /* ancienne version : bloquée par Windows Defender */ }
+    // Quand la Galaxie est installée comme application, Chrome pose sa propre icône sur le bureau :
+    // elle ouvre la fenêtre sans réveiller le serveur (page « endormie »). On la fait passer par le
+    // lanceur, en gardant son nom et sa place, plutôt que d'ajouter une deuxième icône.
+    // (marque de Chrome, ou icône déjà convertie lors d'un passage précédent)
+    const markers = ['--app-id', 'Galaxie.vbs', 'lancer.js'].map((m) => Buffer.from(m, 'utf16le'));
+    const chromeIcons = listFiles(desktop, '.lnk')
+      .filter((f) => /^galaxie\b/i.test(f) && f !== 'Galaxie.lnk')
+      .map((f) => path.join(desktop, f))
+      .filter((f) => { try { const b = fs.readFileSync(f); return markers.some((m) => b.includes(m)); } catch { return false; } });
+    const targets = chromeIcons.length ? chromeIcons : [path.join(desktop, 'Galaxie.lnk')];
+    for (const lnk of targets) winShortcut(lnk, `"${launcher}"`, { icon: path.join(DATA_DIR, 'icon.ico') });
+    made = targets.join(', ');
   } else if (IS_MAC) {
     made = path.join(desktop, 'Galaxie.command');
     fs.writeFileSync(made, `#!/bin/bash\n"${process.execPath}" "${launcher}"\nosascript -e 'tell application "Terminal" to close front window' >/dev/null 2>&1 &\n`, { mode: 0o755 });
