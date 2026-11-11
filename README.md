@@ -29,7 +29,7 @@ Et aussi : une recherche qui fouille les projets, les titres de conversations et
 Dans Claude Code, tape :
 
 ```
-/plugin marketplace add À-COMPLÉTER/galaxie
+/plugin marketplace add hellonexeb-dot/galaxie
 /plugin install galaxie@galaxie
 ```
 
