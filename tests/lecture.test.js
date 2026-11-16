@@ -224,3 +224,24 @@ test('rangement : réutilise ce qui existe, garde notes et statuts, ne touche pa
   assert.equal(r.projets_masques, 1);
   assert.deepEqual(cfg.hidden, [list[2].path]);
 });
+
+test('mise à jour : seule une version installée passe la main à la plus récente', (t) => {
+  const { findNewerInstall } = require('../plugins/galaxie/app/server.js');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'galaxie-maj-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const copy = (v) => {
+    const f = path.join(home, 'plugins', 'cache', 'galaxie', 'galaxie', v, 'app', 'server.js');
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, '');
+    return f;
+  };
+  const old = copy('1.4.0'), recent = copy('1.5.0');
+  const install = (v) => fs.writeFileSync(path.join(home, 'plugins', 'installed_plugins.json'), JSON.stringify({
+    plugins: { 'galaxie@galaxie': [{ installPath: path.join(home, 'plugins', 'cache', 'galaxie', 'galaxie', v), version: v }] },
+  }));
+  install('1.4.0');
+  assert.equal(findNewerInstall(old, home), null);
+  install('1.5.0');
+  assert.equal(findNewerInstall(old, home), path.resolve(recent));
+  assert.equal(findNewerInstall(path.join(home, 'dev', 'app', 'server.js'), home), null);
+});

@@ -57,7 +57,7 @@ Par défaut, Claude Code ne met pas à jour tout seul les plugins de la communau
 - **automatique** (conseillé) : tape `/plugin`, va dans l'onglet **Marketplaces**, choisis **galaxie** puis **Enable auto-update** ;
 - **à la main**, quand tu veux : dans un terminal, `claude plugin update galaxie@galaxie`.
 
-Dans les deux cas, la nouvelle version est prise en compte au prochain démarrage de Claude Code.
+Dans les deux cas, la nouvelle version est prise en compte au prochain démarrage de Claude Code. Si la Galaxie est déjà ouverte, elle passe d'elle-même à la nouvelle version dans la minute, et sa fenêtre se recharge : pas besoin de redémarrer l'ordinateur (depuis la version 1.4.1 ; pour passer de 1.4.0 à 1.4.1, redémarre une dernière fois l'ordinateur).
 
 ## Utilisation
 

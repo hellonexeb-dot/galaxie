@@ -1325,6 +1325,16 @@ async function save(fn, msg, { keepFocus = true } = {}) {
   } catch (e) { toast(e.message, true); }
 }
 
+// Nouvelle version du plugin : le serveur a basculé tout seul, la page se recharge
+// (sans interrompre une saisie ou une fenêtre ouverte).
+setInterval(async () => {
+  if (!state.data?.version) return;
+  const r = await fetch('/api/version').then((x) => x.json()).catch(() => null);
+  if (!r?.version || r.version === state.data.version) return;
+  if ($('#dlg').open || document.activeElement?.matches('input, textarea, select')) return;
+  location.reload();
+}, 30 * 1000);
+
 // Quand on revient sur la page (après une session Claude), on rafraîchit
 let lastSig = '';
 const sig = (d) => JSON.stringify([d.domains, d.themes,d.caps.map((c) => [c.key, c.fr]), d.projects.map((p) => [p.key, p.theme, p.status, p.sessions.length, p.sessions[0]?.title])]);

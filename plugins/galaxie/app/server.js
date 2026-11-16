@@ -417,7 +417,33 @@ function gather() {
     onboarded: cfg.onboarded,
     home: HOME,
     platform: process.platform,
+    version: SELF_VERSION,
   };
+}
+
+// ---------- mise à jour du plugin : passer tout seul à la nouvelle version ----------
+
+// Version de cette copie du plugin (plugin.json à côté du dossier app).
+let SELF_VERSION = null;
+try { SELF_VERSION = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '.claude-plugin', 'plugin.json'), 'utf8')).version || null; } catch { /* copie sans plugin.json */ }
+
+// Si cette copie est une version installée du plugin (cache de Claude Code) et qu'une autre
+// version a été installée depuis, renvoie le chemin de son server.js. Une copie de
+// développement ou une copie locale ne bascule jamais.
+function findNewerInstall(selfFile = __filename, claudeHome = CLAUDE_HOME) {
+  const cache = path.resolve(claudeHome, 'plugins') + path.sep;
+  const self = path.resolve(selfFile);
+  const low = (p) => IS_WIN ? p.toLowerCase() : p;
+  if (!low(self).startsWith(low(cache))) return null;
+  const inst = (readJson(path.join(claudeHome, 'plugins', 'installed_plugins.json')) || {}).plugins || {};
+  for (const [id, list] of Object.entries(inst)) {
+    if (!id.startsWith('galaxie@')) continue;
+    const e = Array.isArray(list) ? list[list.length - 1] : list;
+    if (!e || !e.installPath) continue;
+    const f = path.resolve(e.installPath, 'app', 'server.js');
+    if (low(f) !== low(self) && fs.existsSync(f)) return f;
+  }
+  return null;
 }
 
 // ---------- compétences : skills, plugins, MCP, connecteurs ----------
@@ -865,6 +891,7 @@ const VALID_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _.\-']{0,59}$/u;
 
 async function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/galaxy') return send(res, 200, gather());
+  if (req.method === 'GET' && url.pathname === '/api/version') return send(res, 200, { version: SELF_VERSION });
 
   if (req.method !== 'POST') return send(res, 405, { error: 'Méthode non autorisée' });
   // Bloque les requêtes venant d'autres sites (l'en-tête force un preflight CORS qu'on ne valide jamais).
@@ -1107,7 +1134,7 @@ const server = http.createServer(async (req, res) => {
 // Chargé par les tests (tests/ à la racine du dépôt) : on expose la lecture des conversations
 // sans lancer le serveur ni aucune commande.
 if (require.main !== module) {
-  module.exports = { parseSession, sessionUses, resolveUses, gather, cleanPrompt, applyPlan, loadConfig, saveConfig };
+  module.exports = { parseSession, sessionUses, resolveUses, gather, cleanPrompt, applyPlan, loadConfig, saveConfig, findNewerInstall };
   return;
 }
 
@@ -1256,7 +1283,10 @@ if (!args.includes('--foreground') && !process.env.GALAXIE_CHILD) {
   console.log('Galaxie ouverte sur ' + APP_URL);
   setTimeout(() => process.exit(0), 300);
 } else {
+  let handoverTries = 0;
   server.on('error', (e) => {
+    // Relève d'une ancienne version : elle libère le port, on réessaie quelques secondes.
+    if (e.code === 'EADDRINUSE' && process.env.GALAXIE_HANDOVER && handoverTries++ < 10) return setTimeout(() => server.listen(PORT, HOST), 1000);
     if (e.code === 'EADDRINUSE') { if (!args.includes('--no-open')) openBrowser(APP_URL); setTimeout(() => process.exit(0), 500); }
     else { console.error(e); process.exit(1); }
   });
@@ -1264,4 +1294,22 @@ if (!args.includes('--foreground') && !process.env.GALAXIE_CHILD) {
     console.log('Galaxie en orbite sur ' + APP_URL);
     if (!args.includes('--no-open')) openBrowser(APP_URL);
   });
+
+  // Après « claude plugin update », la nouvelle version est dans un autre dossier : on lui
+  // passe la main sans que l'élève ait à redémarrer. La page ouverte se recharge seule.
+  setInterval(() => {
+    const next = findNewerInstall();
+    if (!next) return;
+    console.log('Nouvelle version installée : ' + next);
+    // Le port doit être libre avant que la nouvelle version ne l'ouvre.
+    let done = false;
+    const handOver = () => {
+      if (done) return; done = true;
+      spawn(process.execPath, [next, '--foreground', '--no-open'], { detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, GALAXIE_CHILD: '1', GALAXIE_HANDOVER: '1' } }).unref();
+      setTimeout(() => process.exit(0), 300);
+    };
+    server.close(handOver);
+    server.closeAllConnections?.();
+    setTimeout(handOver, 3000);
+  }, 60 * 1000).unref();
 }
