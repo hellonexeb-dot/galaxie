@@ -12,8 +12,9 @@ Tu crées un dossier par projet et tu ouvres Claude dedans ? Au bout de quelques
 
 Depuis la fiche d'un projet :
 
-- **Nouvelle conversation** dans le bon dossier, au choix dans Claude Code (terminal) ou dans Claude Desktop ;
+- **Nouvelle conversation** dans le bon dossier, au choix dans Claude Code (terminal), Claude Desktop, Codex (terminal) ou l'application ChatGPT ;
 - **Reprendre** une ancienne conversation là où tu l'avais laissée ;
+- **Mémoire commune** : un fichier `.galaxie/MEMOIRE.md` où Claude, Codex et ChatGPT notent où en est le projet, ce qui a été décidé et la suite. Tu passes de l'un à l'autre sans rien réexpliquer. À activer projet par projet, ou partout d'un coup dans ⚙ Réglages ;
 - statut (idée, en cours, en pause, livré, archivé), note, adresse du site, ouverture du dossier.
 
 La Galaxie s'ouvre **dans sa propre fenêtre**, avec son icône, comme une application (avec Edge, Chrome ou Brave ; sinon dans un onglet de ton navigateur). Tu peux aussi l'**installer** depuis le menu de Chrome ou d'Edge (« Installer Galaxie ») pour la retrouver dans ton menu Démarrer ou ton Launchpad.
@@ -98,7 +99,8 @@ Au premier lancement, la Galaxie te demande si elle peut regarder dans des dossi
 
 - Dans son propre dossier `~/.galaxie` : tes thèmes, statuts, notes et descriptions.
 - **Seulement si tu le demandes** : l'icône « Galaxie » du bureau, et un raccourci de démarrage automatique (dans le dossier « Démarrage » de Windows, les `LaunchAgents` de macOS ou l'`autostart` de Linux).
-- Elle ne modifie jamais `~/.claude` ni tes projets.
+- **Seulement si tu actives la mémoire commune** : dans chaque projet concerné, le dossier `.galaxie/` et quelques lignes de consignes ajoutées à la fin de `CLAUDE.md` et `AGENTS.md` (le reste de ces fichiers est gardé). Jamais dans ton dossier personnel. Dans un dépôt git, les fichiers créés restent sur ton ordinateur (`.git/info/exclude`).
+- Elle ne modifie jamais `~/.claude`, et ne touche pas à tes projets en dehors de la mémoire commune.
 - « Retirer une planète » ne fait que la masquer : ton dossier n'est jamais supprimé.
 - Le bouton « + Projet » crée un dossier vide, à l'endroit que tu as choisi.
 

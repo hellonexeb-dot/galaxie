@@ -1184,7 +1184,7 @@ function renderProjectPanel(pl) {
     <div class="eyebrow">Planète · ${pl.sys.errant ? 'errante' : `<button id="pp-theme-link">${esc(pl.sys.name)}</button>`}</div>
     <h2>${esc(p.name)}</h2>
     <p class="path">${esc(p.path)}</p>
-    <h3 class="launch-title">Nouvelle conversation avec Claude</h3>
+    <h3 class="launch-title">Nouvelle conversation</h3>
     <div class="launch">
       <button class="btn primary" id="pp-launch" title="Ouvre Claude Code dans le terminal, dans ce dossier">
         <span class="ico">›_</span><span><b>Claude Code</b><small>dans le terminal</small></span>
@@ -1192,12 +1192,19 @@ function renderProjectPanel(pl) {
       <button class="btn primary alt" id="pp-desktop" title="Ouvre Claude Desktop (onglet Code) sur ce dossier">
         <span class="ico">✦</span><span><b>Claude Desktop</b><small>l’application</small></span>
       </button>
+      <button class="btn primary codex" id="pp-codex" ${state.data.hasCodex ? '' : 'disabled'} title="${state.data.hasCodex ? 'Ouvre Codex dans le terminal, dans ce dossier' : 'Codex CLI est introuvable sur cet ordinateur'}">
+        <span class="ico">›_</span><span><b>Codex</b><small>dans le terminal</small></span>
+      </button>
+      <a class="btn primary chatgpt" id="pp-chatgpt" href="codex://threads/new?path=${encodeURIComponent(p.path)}&amp;prompt=${encodeURIComponent('Reprenons le projet ' + p.name + '. Lis les consignes du projet et sa mémoire commune .galaxie/MEMOIRE.md si elle existe. Résume où nous en sommes et propose la prochaine étape. Après le travail, mets à jour cette mémoire en conservant les décisions et le journal existants. Si la mémoire manque, indique-le avant de la créer.')}" title="Ouvre ChatGPT desktop dans ce dossier, avec un message de reprise à envoyer">
+        <span class="ico">✳</span><span><b>ChatGPT desktop</b><small>l’application</small></span>
+      </a>
     </div>
     <div class="actions">
       <button class="btn small" id="pp-folder">Ouvrir le dossier</button>
       ${state.data.hasCode ? '<button class="btn small" id="pp-code">VS Code</button>' : ''}
       ${p.url ? `<a class="btn small" href="${esc(p.url)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none">Voir le site ↗</a>` : ''}
     </div>
+    <section id="pp-memory"><h3>Mémoire commune</h3><p class="empty-note">Chargement de la mémoire…</p></section>
     <section><h3>Thème</h3>
       <select class="field" id="pp-theme">
         ${themeOptions(p.theme)}
@@ -1216,6 +1223,7 @@ function renderProjectPanel(pl) {
 
   $('#pp-theme-link')?.addEventListener('click', () => focusSystem(pl.sys));
   $('#pp-launch').onclick = () => api.post('/api/launch', { path: p.path }).then(() => toast('Claude Code s’ouvre dans le terminal…')).catch((e) => toast(e.message, true));
+  $('#pp-codex').onclick = () => api.post('/api/launch', { path: p.path, app: 'codex' }).then(() => toast('Codex s’ouvre dans le terminal…')).catch((e) => toast(e.message, true));
   $('#pp-desktop').onclick = () => api.post('/api/launch', { path: p.path, app: 'desktop' }).then(() => toast('Claude Desktop s’ouvre : confirme le dossier dans la fenêtre')).catch((e) => toast(e.message, true));
   $('#pp-folder').onclick = () => api.post('/api/open', { path: p.path, app: 'explorer' }).catch((e) => toast(e.message, true));
   $('#pp-code')?.addEventListener('click', () => api.post('/api/open', { path: p.path, app: 'code' }).catch((e) => toast(e.message, true)));
@@ -1238,6 +1246,18 @@ function renderProjectPanel(pl) {
     } catch (e) { toast(e.message, true); }
   });
   const note = $('#pp-note');
+  const memoryPanel = $('#pp-memory');
+  const showMemory = (m) => {
+    if (!memoryPanel.isConnected) return;
+    memoryPanel.innerHTML = '<h3>Mémoire commune</h3>' + (m.enabled
+      ? `<p class="empty-note">Claude, Codex et ChatGPT Work partagent ce fichier. Les consignes leur demandent de le mettre à jour après le travail.</p><textarea class="field" id="pp-memory-text" rows="12" aria-label="Mémoire commune du projet">${esc(m.text)}</textarea><div class="actions"><button class="btn small" id="pp-memory-save">Enregistrer</button><button class="btn small" id="pp-memory-reload">Recharger</button></div>`
+      : m.allowed === false ? '<p class="empty-note">Pas de mémoire commune dans ton dossier personnel : elle serait lue par tous tes projets. Range plutôt ce travail dans un dossier de projet.</p>'
+      : '<p class="empty-note">Partage l’état du projet, les décisions et les prochaines étapes entre tes assistants. L’activation ajoute une mémoire et des consignes dans ce dossier.</p><button class="btn small" id="pp-memory-enable">Activer la mémoire commune</button>');
+    memoryPanel.querySelector('#pp-memory-enable')?.addEventListener('click', () => api.post('/api/memory', { path: p.path, action: 'enable' }).then(showMemory).catch((e) => toast(e.message, true)));
+    memoryPanel.querySelector('#pp-memory-reload')?.addEventListener('click', () => api.post('/api/memory', { path: p.path, action: 'read' }).then(showMemory).catch((e) => toast(e.message, true)));
+    memoryPanel.querySelector('#pp-memory-save')?.addEventListener('click', () => api.post('/api/memory', { path: p.path, action: 'save', text: memoryPanel.querySelector('textarea').value, revision: m.revision }).then((updated) => { showMemory(updated); toast('Mémoire enregistrée'); }).catch((e) => toast(e.message, true)));
+  };
+  api.post('/api/memory', { path: p.path, action: 'read' }).then(showMemory).catch((e) => { if (memoryPanel.isConnected) memoryPanel.querySelector('p').textContent = e.message; });
   note.onblur = () => { if (note.value !== p.note) api.post('/api/project', { path: p.path, note: note.value }).then(() => { p.note = note.value; toast('Note enregistrée'); }).catch((e) => toast(e.message, true)); };
   const url = $('#pp-url');
   url.onchange = () => api.post('/api/project', { path: p.path, url: url.value }).then(() => { p.url = url.value.trim(); renderProjectPanel(pl); toast('Adresse enregistrée'); }).catch((e) => toast(e.message, true));
@@ -1525,6 +1545,10 @@ function openSettings() {
             : '<button type="button" class="btn small primary" id="s-install-tab">Ouvrir dans le navigateur pour l’installer</button><p class="sub">Un onglet s’ouvre : clique sur l’icône <b>Installer</b> (un écran avec une flèche ou un <b>+</b>) à droite de la barre d’adresse, puis sur <b>Installer</b>. Tu pourras ensuite l’épingler à la barre des tâches avec sa propre icône.</p>'}
         <label class="check"><input type="checkbox" id="s-auto" ${d.autostart ? 'checked' : ''}> Lancer la Galaxie au démarrage de l’ordinateur <span>discrètement, sans ouvrir de fenêtre, pour que l’application épinglée fonctionne toujours</span></label>
       </div>
+      <label>Mémoire commune</label>
+      <div class="app-box">
+        <label class="check"><input type="checkbox" id="s-memory" ${d.memoryAll ? 'checked' : ''}> Mémoire commune dans tous mes projets <span>Chaque projet, et chaque nouveau projet, reçoit un fichier .galaxie/MEMOIRE.md et des consignes (CLAUDE.md, AGENTS.md). Claude, Codex et ChatGPT y notent où en est le projet : tu peux reprendre avec l’un ou l’autre. Ton dossier personnel n’en reçoit pas.</span></label>
+      </div>
       <label>Affichage</label>
       <div class="app-box">
         <label class="check"><input type="checkbox" id="s-light" ${lightMode ? 'checked' : ''}> Mode PC modeste <span>Image un peu moins fine et sans lueur autour des soleils, mais plus fluide sur un ordinateur ancien ou sans carte graphique. Ce réglage ne vaut que pour cet ordinateur.</span></label>
@@ -1543,6 +1567,10 @@ function openSettings() {
   $('#s-install-tab')?.addEventListener('click', () => api.post('/api/open-tab', {}).then(() => toast('Regarde à droite de la barre d’adresse : icône « Installer »')).catch((e) => toast(e.message, true)));
   $('#s-auto').onchange = async (e) => {
     try { const r = await api.post('/api/autostart', { on: e.target.checked }); state.data.autostart = r.autostart; toast(r.autostart ? 'La Galaxie se lancera au démarrage' : 'Démarrage automatique désactivé'); }
+    catch (err) { e.target.checked = !e.target.checked; toast(err.message, true); }
+  };
+  $('#s-memory').onchange = async (e) => {
+    try { const r = await api.post('/api/memory-all', { on: e.target.checked }); state.data.memoryAll = r.memoryAll; toast(r.memoryAll ? `Mémoire commune activée${r.created ? ` dans ${r.created} projet${r.created > 1 ? 's' : ''}` : ''}` : 'Les nouveaux projets n’auront plus de mémoire automatiquement'); }
     catch (err) { e.target.checked = !e.target.checked; toast(err.message, true); }
   };
   $('#s-light').onchange = (e) => { setLightMode(e.target.checked); toast(e.target.checked ? 'Mode PC modeste activé' : 'Affichage complet rétabli'); };

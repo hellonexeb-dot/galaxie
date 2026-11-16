@@ -10,3 +10,4 @@ ancienne-version/
 
 # captures des outils de test du navigateur
 .playwright-mcp/
+.galaxie/

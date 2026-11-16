@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
+const memory = require('./memory');
 
 const IS_WIN = process.platform === 'win32';
 const IS_MAC = process.platform === 'darwin';
@@ -55,6 +56,7 @@ function findOnPath(names) {
 
 const WT = IS_WIN ? findOnPath(['wt.exe']) : null;
 const CLAUDE = findOnPath(IS_WIN ? ['claude.exe', 'claude.cmd'] : ['claude']) || 'claude';
+const CODEX = findOnPath(IS_WIN ? ['codex.exe', 'codex.cmd'] : ['codex']);
 const CODE = findOnPath(IS_WIN ? ['code.cmd'] : ['code']) || (IS_MAC && fs.existsSync('/Applications/Visual Studio Code.app') ? 'open-vscode' : null);
 
 function loadConfig() {
@@ -69,6 +71,7 @@ function loadConfig() {
     themes: Array.isArray(c.themes) ? c.themes : null, // null = jamais initialisés
     domains: Array.isArray(c.domains) ? c.domains : [], // galaxies de projets (Pro, Perso…)
     capTexts: c.capTexts && typeof c.capTexts === 'object' ? c.capTexts : {},
+    memoryAll: !!c.memoryAll, // mémoire commune dans tous les projets, nouveaux compris
   };
 }
 
@@ -395,6 +398,7 @@ function gather() {
 
   const caps = withTexts(gatherCaps(out), cfg);
   resolveUses(out, caps);
+  const memoryCreated = cfg.memoryAll ? memory.enableMissing(out) : 0;
 
   return {
     domains: cfg.domains,
@@ -402,6 +406,9 @@ function gather() {
     projects: out,
     caps,
     hasCode: !!CODE,
+    hasCodex: !!CODEX,
+    memoryAll: cfg.memoryAll,
+    memoryCreated,
     hiddenCount: cfg.hidden.length,
     autostart: autostartEnabled(),
     appInstalled: !!findInstalledApp(),
@@ -636,19 +643,34 @@ function claudeEnv() {
 
 const cmdq = (v) => '"' + String(v).replace(/"/g, '') + '"'; // guillemets cmd.exe
 
-function launchClaude(dir, sessionId, title) {
-  const cargs = sessionId ? ['--resume', sessionId] : [];
+function launchClaude(dir, sessionId, title, provider = 'claude') {
+  let executable = CLAUDE;
+  let cargs = sessionId ? ['--resume', sessionId] : [];
+  if (provider === 'codex') {
+    if (!CODEX) throw new Error('Codex CLI est introuvable sur cet ordinateur');
+    executable = CODEX;
+    cargs = [];
+    // Les installations npm Windows fournissent un .cmd : exécuter directement
+    // son entrée Node évite de passer les chemins des projets à cmd.exe.
+    if (IS_WIN && /\.cmd$/i.test(CODEX)) {
+      const entry = path.join(path.dirname(CODEX), 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
+      if (!fs.existsSync(entry)) throw new Error('Installation Codex CLI incomplète');
+      executable = process.execPath;
+      cargs = [entry];
+    }
+    title = 'Codex · ' + title;
+  }
   const env = claudeEnv();
   if (IS_WIN) {
     const safeTitle = String(title || 'Claude').replace(/[;"]/g, ' ').slice(0, 60);
     // Tous les projets s'ouvrent comme onglets d'une même fenêtre « galaxie ».
-    if (WT) return detached(WT, ['-w', 'galaxie', 'nt', '-d', dir, '--title', safeTitle, CLAUDE, ...cargs], { windowsHide: false, env });
+    if (WT) return detached(WT, ['-w', 'galaxie', 'nt', '-d', dir, '--title', safeTitle, executable, ...cargs], { windowsHide: false, env });
     // « start » prend le premier argument entre guillemets pour le titre : sans guillemets,
     // il le prendrait pour le programme à lancer. On écrit donc la ligne nous-mêmes.
-    const line = ['start', cmdq(safeTitle), '/D', cmdq(dir), cmdq(CLAUDE), ...cargs.map(cmdq)].join(' ');
+    const line = ['start', cmdq(safeTitle), '/D', cmdq(dir), cmdq(executable), ...cargs.map(cmdq)].join(' ');
     return detached('cmd.exe', ['/d', '/c', line], { windowsVerbatimArguments: true, env });
   }
-  const line = `cd ${shq(dir)} && ${shq(CLAUDE)} ${cargs.map(shq).join(' ')}`;
+  const line = `cd ${shq(dir)} && ${shq(executable)} ${cargs.map(shq).join(' ')}`;
   if (IS_MAC) {
     return detached('osascript', ['-e', `tell application "Terminal" to do script ${asq(line)}`, '-e', 'tell application "Terminal" to activate'], { env });
   }
@@ -656,8 +678,8 @@ function launchClaude(dir, sessionId, title) {
   const term = findOnPath(['gnome-terminal', 'konsole', 'xfce4-terminal', 'x-terminal-emulator', 'xterm']);
   if (!term) throw new Error('Aucun terminal trouvé');
   const name = path.basename(term);
-  if (name === 'gnome-terminal') return detached(term, ['--working-directory=' + dir, '--', CLAUDE, ...cargs], { env });
-  if (name === 'konsole') return detached(term, ['--workdir', dir, '-e', CLAUDE, ...cargs], { env });
+  if (name === 'gnome-terminal') return detached(term, ['--working-directory=' + dir, '--', executable, ...cargs], { env });
+  if (name === 'konsole') return detached(term, ['--workdir', dir, '-e', executable, ...cargs], { env });
   return detached(term, ['-e', 'bash', '-lc', line], { env });
 }
 
@@ -849,9 +871,26 @@ async function handleApi(req, res, url) {
   if (req.headers['x-galaxie'] !== '1') return send(res, 403, { error: 'Interdit' });
   const body = await readBody(req);
 
+  if (url.pathname === '/api/memory') {
+    const p = findProject(body.path);
+    if (!p) return send(res, 404, { error: 'Projet introuvable' });
+    try {
+      if (body.action === 'enable') return send(res, 200, memory.enable(p.path, p.name, p.note));
+      if (body.action === 'save') return send(res, 200, memory.save(p.path, body.text, body.revision));
+      if (body.action === 'read') return send(res, 200, memory.read(p.path));
+      return send(res, 400, { error: 'Action inconnue' });
+    } catch (e) { return send(res, e.status || 400, { error: e.message }); }
+  }
+
   if (url.pathname === '/api/launch') {
     const p = findProject(body.path);
     if (!p) return send(res, 404, { error: 'Projet introuvable' });
+    if (body.app === 'codex') {
+      if (body.sessionId) return send(res, 400, { error: 'Cette conversation appartient à Claude' });
+      try { launchClaude(p.path, null, p.name, 'codex'); }
+      catch (e) { return send(res, 500, { error: e.message }); }
+      return send(res, 200, { ok: true });
+    }
     let sessionId = null, dir = p.path;
     if (body.sessionId) {
       const s = p.sessions.find((x) => x.id === body.sessionId);
@@ -1009,6 +1048,14 @@ async function handleApi(req, res, url) {
     const browser = findBrowserApp();
     if (browser) detached(browser, [APP_URL], { windowsHide: false }); else openUrl(APP_URL);
     return send(res, 200, { ok: true });
+  }
+
+  if (url.pathname === '/api/memory-all') {
+    const cfg = loadConfig();
+    cfg.memoryAll = body.on === true;
+    saveConfig(cfg);
+    const created = cfg.memoryAll ? gather().memoryCreated : 0; // gather() crée les mémoires manquantes
+    return send(res, 200, { ok: true, memoryAll: cfg.memoryAll, created });
   }
 
   if (url.pathname === '/api/autostart') {

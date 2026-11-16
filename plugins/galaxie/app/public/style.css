@@ -215,6 +215,11 @@ select.field option { background: #15142a; }
 .launch .ico { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: rgba(0,0,0,.14); font: 600 13px ui-monospace, 'Cascadia Code', monospace; }
 .launch .btn.alt { background: #e8dcc8; color: #1b1404; }
 .launch .btn.alt:hover { background: #f3e9d8; }
+.launch .btn.codex { background: #a6e5d1; color: #102b24; }
+.launch .btn.codex:hover { background: #c0f1e2; }
+.launch .btn.codex:disabled { opacity: .45; cursor: not-allowed; }
+.launch .btn.chatgpt { background: #d7e7ff; color: #182a43; text-decoration: none; }
+.launch .btn.chatgpt:hover { background: #e6efff; }
 
 /* ---------- plugin : réglages, aide ---------- */
 .btn.icon { width: 38px; padding: 0; font-size: 16px; }

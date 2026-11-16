@@ -18,7 +18,7 @@ plugins/galaxie/
 ## Règles du projet
 
 - **Rien ne sort de la machine.** Aucun CDN, aucune requête externe, aucun envoi de données. Le serveur n'écoute que `127.0.0.1`.
-- **Lecture seule sur `~/.claude`.** La Galaxie n'écrit que dans `~/.galaxie` (configuration, descriptions, lanceur, icônes), plus, **à la demande**, l'icône du bureau et le raccourci de démarrage automatique.
+- **Lecture seule sur `~/.claude`.** La Galaxie n'écrit que dans `~/.galaxie` (configuration, descriptions, lanceur, icônes), plus, **à la demande**, l'icône du bureau, le raccourci de démarrage automatique et la mémoire commune des projets (`memory.js` : `.galaxie/MEMOIRE.md` et consignes ajoutées à `CLAUDE.md`/`AGENTS.md`, par projet ou partout avec le réglage `memoryAll`, nouveaux projets compris ; jamais dans le dossier personnel ; dans un dépôt git, les fichiers créés vont dans `.git/info/exclude`).
 - **Jamais de secret affiché** : pour les serveurs MCP, seulement le nom et l'hôte (`safeTarget`).
 - **Aucun dossier exploré sans accord** : `scanRoots` est vide tant que l'écran de bienvenue n'a pas été validé.
 - Les requêtes POST exigent l'en-tête `X-Galaxie: 1` (protection contre les autres sites) et l'hôte doit être `127.0.0.1` ou `localhost` (DNS rebinding).
@@ -74,3 +74,15 @@ Une conversation est affichée sur la planète du projet où elle a fait **le pl
 - **Liens `claude://`** : à ouvrir avec `rundll32 url.dll,FileProtocolHandler` sous Windows ; `explorer.exe` les prend pour un dossier.
 - **Application installée** : Chrome crée un raccourci `.lnk` avec `--app-id` dans un sous-dossier du menu Démarrer dont le nom dépend de la langue (« Applications Chrome »). Edge n'en crée pas de détectable : Chrome passe donc en priorité.
 - **Éclairage 3D** : l'utilisateur ne veut ni planètes lumineuses ni soleils éblouissants. Planètes réalistes (textures procédurales), seuil de bloom élevé.
+
+
+<!-- galaxie-memoire -->
+## Mémoire commune Galaxie
+
+Ces consignes concernent uniquement le projet contenant ce fichier de consignes.
+Si tu travailles dans un sous-projet ayant sa propre mémoire, utilise celle du sous-projet.
+Au début du travail, lis .galaxie/MEMOIRE.md dans ce projet. Claude Code, Codex et ChatGPT Work partagent ce même fichier.
+Après chaque étape significative et avant ta réponse finale, mets à jour son état, les décisions explicitement validées par Seb, les prochaines étapes et les vérifications. Ajoute au journal la date et ton nom.
+Relis le fichier juste avant de le modifier pour conserver le travail récent des autres assistants. Ne supprime pas le journal existant. Signale les contradictions au lieu de les résoudre par supposition.
+Distingue les propositions des décisions validées. Ne copie aucun secret ni historique intégral. Respecte les autres consignes du projet. Si le dossier est inaccessible, indique que la mémoire n’a pas été mise à jour.
+<!-- /galaxie-memoire -->
